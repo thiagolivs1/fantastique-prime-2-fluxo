@@ -92,6 +92,8 @@
   .chip { display:inline-flex; align-items:center; gap:6px; padding:3px 10px; border-radius:99px; font:600 12px var(--body); }
   .chip.ok { background:#D6EBDF; color:#1F5A3F; } .chip.warn { background:#F6E7C3; color:#6E4B00; } .chip.bad { background:#F5D5CF; color:#8A2413; }
   .alerts { margin:14px 0 0; padding:0; list-style:none; display:grid; gap:6px; }
+  .sugestao { margin-top:14px; padding:14px; border-radius:10px; background:#F4EADF; border-left:3px solid var(--bronze); font-size:14px; }
+  .sugestao .btn { margin-top:10px; }
   .alerts li { padding:8px 12px; border-left:3px solid var(--alert); background:#FBEDEA; font-size:13px; border-radius:0 6px 6px 0; }
 
   /* 3 · Propostas */
@@ -220,10 +222,11 @@
   <!-- 2 -->
   <section class="step" id="s2">
     <h2><span class="n">2</span>Cliente e financiamento</h2>
-    <p class="lead">Entrada é tudo o que não é financiado pela Caixa: sinal + parcelas + balões.</p>
+    <p class="lead">O sinal e o FGTS abatem o que fica parcelado com a construtora. O parcelamento é que precisa ficar em até 20% do valor de venda.</p>
     <div class="fields no-print">
       <label class="f">Renda mensal do cliente <span>Base para os limites de parcela e balão</span><input id="renda" type="number" min="0" step="100" value="10000"></label>
       <label class="f">Sinal (R$) <span id="sinalPct">Tabela: 2% do valor de venda</span><input id="sinal" type="number" min="0" step="100"></label>
+      <label class="f">Sinal em quantas vezes <span>1 = à vista. Parcelas mensais, sem correção</span><input id="sinalVezes" type="number" min="1" max="24" step="1" value="1"></label>
       <label class="f">FGTS (R$) <span>Abate da entrada · liberado na assinatura com a Caixa</span><input id="fgts" type="number" min="0" step="100" value="0"></label>
       <label class="f">Data do sinal <span>Parcelas começam no mês seguinte</span><input id="dataSinal" type="date"></label>
     </div>
@@ -237,11 +240,13 @@
       </div>
       <div class="gauge-wrap">
         <div class="gauge-head">
-          <div><span class="under">Entrada total</span><br><strong id="entPct">—</strong> <span class="num" id="entVal"></span></div>
+          <div><span class="under">Parcelado com a construtora</span><br><strong id="entPct">—</strong> <span class="num" id="entVal"></span></div>
           <span id="entChip"></span>
         </div>
         <div class="gauge" aria-hidden="true"><div class="band"></div><div class="fill" id="gFill"></div></div>
         <div class="scale"><span>0%</span><span>10%</span><span class="ideal">20% · limite</span><span>30%</span><span>40%</span></div>
+        <div class="row-between under" id="entResumo" style="margin-top:8px"></div>
+        <div class="sugestao" id="sugestao" hidden></div>
       </div>
       <ul class="alerts" id="alerts"></ul>
     </div>
@@ -376,7 +381,7 @@ function desenharColuna() {
 function selecionar(u) {
   st.unit = u; st.col = { t: u[0], c: colunaDe(u) }; st.valorB = null;
   $('sinal').value = r2(u[3] * 0.02);
-  $('fin').value = r2(Math.min(u[4] * LTV, u[3] * LTV));
+  if ($('fin').value === '') $('fin').value = r2(Math.min(u[4] * LTV, u[3] * LTV)); // financiamento, FGTS e renda seguem entre unidades
   desenharColuna();
   $('unit').innerHTML = `
     <div class="eyebrow">Torre ${u[0]} · Unidade ${u[1]} · ${m2(u[2])}</div>
@@ -405,10 +410,13 @@ $('pins').addEventListener('click', e => {
 $('andares').addEventListener('click', e => { const b = e.target.closest('.andar'); if (b) selecionar(U[b.dataset.i]); });
 
 // ---------- Cálculo ----------
-function montarFluxo(p, saldo, sinal, fin, fgts, d0, valorB, incc, ipca) {
+function montarFluxo(p, saldo, sinal, vezes, fin, fgts, d0, valorB, incc, ipca) {
   const nb = p.baloes.length, balao = nb ? valorB : 0;
   const parcela = (saldo - balao * nb) / MESES;
-  const rows = [{ n: 0, data: d0, tipo: 'Sinal', nom: sinal, cor: sinal, fase: 'Sem correção' }];
+  const rows = Array.from({ length: vezes }, (_, k) => ({
+    n: k ? `S${k + 1}` : 0, data: addMes(d0, k), tipo: vezes > 1 ? `Sinal ${k + 1}/${vezes}` : 'Sinal',
+    nom: sinal / vezes, cor: sinal / vezes, fase: 'Sem correção',
+  }));
   let f = 1;
   for (let m = 1; m <= MESES; m++) {
     const d = addMes(d0, m), pos = d.getFullYear() * 12 + d.getMonth() > ENTREGA_IDX;
@@ -434,21 +442,39 @@ function calcular() {
   let fin = Math.max(+$('fin').value || 0, 0);
   if (fin > cap) { fin = cap; $('fin').value = cap; alerts.push(`Financiamento limitado a ${brl(cap)} (80% do valor de avaliação).`); }
   $('finRange').max = cap; $('finRange').value = fin;
-  $('finCap').textContent = `Máximo ${brl(cap)} · ${pct(fin / venda)} do valor de venda`;
+  $('finCap').innerHTML = `Máximo ${brl(cap)} · ${pct(fin / venda)} do valor de venda · <button class="linkbtn" id="finPadrao" type="button">usar padrão de 80%</button>`;
   if (!u[4]) alerts.push('Esta unidade está sem valor de avaliação na tabela. Confirme com a Caixa antes de simular financiamento.');
 
   const sinal = Math.max(+$('sinal').value || 0, 0);
+  const vezes = Math.min(Math.max(parseInt($('sinalVezes').value, 10) || 1, 1), 24);
   $('sinalPct').textContent = `${pct(sinal / venda, 2)} do valor de venda · tabela: 2%`;
   const fgts = Math.max(+$('fgts').value || 0, 0);
-  const entrada = venda - fin, pEnt = entrada / venda, saldo = entrada - sinal - fgts;
+  // Entrada = tudo que não é do banco. O que conta para os 20% é só o que fica parcelado,
+  // ou seja, a entrada depois de descontar sinal e FGTS.
+  const entrada = venda - fin, pEnt = entrada / venda, saldo = entrada - sinal - fgts, pSaldo = saldo / venda;
 
-  $('entPct').textContent = pct(pEnt, 2);
-  $('entVal').textContent = brl(entrada);
-  $('gFill').style.width = Math.min(pEnt / 0.4, 1) * 100 + '%';
-  const acima = entrada > venda * ENT_MAX + 0.01; // tolerância de centavos
+  $('entPct').textContent = pct(Math.max(pSaldo, 0), 2);
+  $('entVal').textContent = brl(Math.max(saldo, 0));
+  $('gFill').style.width = Math.min(Math.max(pSaldo, 0) / 0.4, 1) * 100 + '%';
+  const acima = saldo > venda * ENT_MAX + 0.01; // tolerância de centavos
   $('gFill').classList.toggle('over', acima);
   $('entChip').innerHTML = acima ? '<span class="chip warn">Acima de 20% · precisa de aprovação do gerente</span>'
     : '<span class="chip ok">Até 20% · dentro do permitido</span>';
+  $('entResumo').innerHTML = `<span>Entrada total (fora o banco): <b class="num">${brl(entrada)}</b> · ${pct(pEnt, 2)}</span>`
+    + `<span>Sinal ${pct(sinal / venda, 2)}${vezes > 1 ? ` em ${vezes}x` : ''} · FGTS ${pct(fgts / venda, 2)}</span>`;
+
+  // Sinal que zera o excedente: entrada − FGTS − 20% do valor de venda
+  const sinalIdeal = r2(Math.max(entrada - fgts - venda * ENT_MAX, 0));
+  const sug = $('sugestao');
+  sug.hidden = sinalIdeal <= sinal + 0.01;
+  if (!sug.hidden) {
+    const parcelaIdeal = venda * ENT_MAX / MESES;
+    sug.dataset.sinal = sinalIdeal;
+    sug.innerHTML = `<b>Financiamento em ${pct(fin / venda)} do valor de venda</b>, abaixo do padrão de 80%. Sobra mais para parcelar com a construtora.<br>
+      Com sinal de <b class="num">${brl(sinalIdeal)}</b> (${pct(sinalIdeal / venda)}), o parcelamento fica nos 20%: 60x de <b class="num">${brl(parcelaIdeal)}</b> sem balões.
+      ${renda && parcelaIdeal > renda * LIM_PARC ? '<br>Essa parcela ainda passa de 30% da renda: use balões na etapa 3.' : ''}
+      <button class="btn btn-alt" id="aplicarSinal" type="button">Usar esse sinal</button>`;
+  }
   if (!renda) alerts.push('Informe a renda do cliente para validar os limites de parcela e balão.');
   if (saldo < 0) alerts.push('Sinal e FGTS somam mais que a entrada. Reduza um deles ou o valor financiado.');
   $('alerts').innerHTML = alerts.map(a => `<li>${a}</li>`).join('');
@@ -470,7 +496,7 @@ function calcular() {
 
   const res = (st.baloes ? [0, st.tipoB] : [0]).map(i => {
     const p = PROPOSTAS[i];
-    const r = montarFluxo(p, saldo, sinal, fin, fgts, d0, valorB, incc, ipca);
+    const r = montarFluxo(p, saldo, sinal, vezes, fin, fgts, d0, valorB, incc, ipca);
     r.okParc = renda > 0 && r.parcela >= 0 && r.parcela <= renda * LIM_PARC + 0.005;
     r.okBalao = !p.baloes.length || (renda > 0 && r.balao <= renda * LIM_BALAO + 0.005);
     return { ...p, ...r, i };
@@ -492,17 +518,17 @@ function calcular() {
   }).join('');
 
   const p = res.find(r => r.i === st.prop) || res[0];
-  desenharFluxo(p, { venda, aval: u[4], sinal, fin, fgts, d0, renda });
+  desenharFluxo(p, { venda, aval: u[4], sinal, vezes, fin, fgts, d0, renda });
 }
 
 // ---------- 4 · Fluxo ----------
 // Bom pagador = avaliação − venda. Só vale quando o financiamento passa de 80% da venda
 // (e fica até 80% da avaliação, garantido pelo teto). Aí o valor do imóvel passa a ser a avaliação.
-function condicaoVenda(p, { venda, aval, sinal, fin, fgts, d0 }) {
+function condicaoVenda(p, { venda, aval, sinal, vezes, fin, fgts, d0 }) {
   const bomPagador = fin > venda * LTV + 0.01 ? aval - venda : 0;
   const nb = p.baloes.length;
   const linhas = [
-    { i: 0, tipo: 'Sinal', qte: 1, venc: d0, valor: sinal, obs: 'Sem correção' },
+    { i: 0, tipo: 'Sinal', qte: vezes, venc: d0, valor: r2(sinal / vezes), obs: vezes > 1 ? 'Mensais, sem correção' : 'Sem correção' },
     { i: 2, tipo: 'Parcelas', qte: MESES, venc: addMes(d0, 1), valor: r2(p.parcela), obs: 'INCC até entrega, IPCA+1% após' },
     bomPagador > 0 && { i: 3, tipo: 'Bom pagador', qte: 1, venc: null, valor: r2(bomPagador), obs: 'Avaliação − venda' },
     nb && { i: 4, tipo: 'Balões', qte: nb, venc: addMes(d0, p.baloes[0]), valor: r2(p.balao), obs: nb === 2 ? 'Anuais' : 'Semestrais' },
@@ -515,9 +541,9 @@ function condicaoVenda(p, { venda, aval, sinal, fin, fgts, d0 }) {
 const isoData = d => d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` : '';
 const moeda = v => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-function desenharFluxo(p, { venda, aval, sinal, fin, fgts, d0, renda }) {
+function desenharFluxo(p, { venda, aval, sinal, vezes, fin, fgts, d0, renda }) {
   $('fluxoTitulo').textContent = `Fluxo · ${p.nome}`;
-  const cv = condicaoVenda(p, { venda, aval, sinal, fin, fgts, d0 });
+  const cv = condicaoVenda(p, { venda, aval, sinal, vezes, fin, fgts, d0 });
   const cls = { 'Balões': 'balao', 'Banco': 'banco', 'FGTS': 'banco', 'Bom pagador': 'bompag' };
   $('condicao').innerHTML = `<tr><th>Tipo</th><th>Qtd</th><th>1º vencimento</th><th>Valor parcela</th><th>Total</th><th class="obs">Observações</th></tr>` +
     cv.linhas.map(l => `<tr class="${cls[l.tipo] || ''}"><td>${l.tipo}</td><td>${l.qte}</td><td>${l.venc ? dataBR(l.venc) : '—'}</td><td class="num">${brl(l.valor)}</td><td class="num">${brl(l.valor * l.qte)}</td><td class="obs">${l.obs}</td></tr>`).join('') +
@@ -579,7 +605,14 @@ $('exportar').addEventListener('click', () => {
   if (!window.open(url, '_blank')) location.href = url;
 });
 $('finRange').addEventListener('input', e => { $('fin').value = e.target.value; calcular(); });
-['renda', 'sinal', 'fgts', 'fin', 'dataSinal', 'incc', 'ipca'].forEach(id => $(id).addEventListener('input', calcular));
+$('sugestao').addEventListener('click', e => { if (e.target.id === 'aplicarSinal') { $('sinal').value = $('sugestao').dataset.sinal; calcular(); } });
+$('finCap').addEventListener('click', e => {
+  if (e.target.id !== 'finPadrao') return;
+  const u = st.unit;
+  $('fin').value = r2(Math.min(u[4] * LTV, u[3] * LTV));
+  calcular();
+});
+['renda', 'sinal', 'sinalVezes', 'fgts', 'fin', 'dataSinal', 'incc', 'ipca'].forEach(id => $(id).addEventListener('input', calcular));
 
 $('dataSinal').value = new Date().toISOString().slice(0, 10);
 selecionar(U.find(u => u[0] === 1 && u[1] === 101));
