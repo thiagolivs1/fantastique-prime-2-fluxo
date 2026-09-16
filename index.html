@@ -224,6 +224,7 @@
     <div class="fields no-print">
       <label class="f">Renda mensal do cliente <span>Base para os limites de parcela e balão</span><input id="renda" type="number" min="0" step="100" value="10000"></label>
       <label class="f">Sinal (R$) <span id="sinalPct">Tabela: 2% do valor de venda</span><input id="sinal" type="number" min="0" step="100"></label>
+      <label class="f">FGTS (R$) <span>Abate da entrada · liberado na assinatura com a Caixa</span><input id="fgts" type="number" min="0" step="100" value="0"></label>
       <label class="f">Data do sinal <span>Parcelas começam no mês seguinte</span><input id="dataSinal" type="date"></label>
     </div>
     <div class="finbox">
@@ -404,7 +405,7 @@ $('pins').addEventListener('click', e => {
 $('andares').addEventListener('click', e => { const b = e.target.closest('.andar'); if (b) selecionar(U[b.dataset.i]); });
 
 // ---------- Cálculo ----------
-function montarFluxo(p, saldo, sinal, fin, d0, valorB, incc, ipca) {
+function montarFluxo(p, saldo, sinal, fin, fgts, d0, valorB, incc, ipca) {
   const nb = p.baloes.length, balao = nb ? valorB : 0;
   const parcela = (saldo - balao * nb) / MESES;
   const rows = [{ n: 0, data: d0, tipo: 'Sinal', nom: sinal, cor: sinal, fase: 'Sem correção' }];
@@ -418,6 +419,7 @@ function montarFluxo(p, saldo, sinal, fin, d0, valorB, incc, ipca) {
   }
   const totalCor = rows.reduce((s, r) => s + r.cor, 0);
   rows.push({ n: '—', data: DATA_BANCO, tipo: 'Financiamento Caixa', nom: fin, cor: fin, fase: 'Banco' });
+  if (fgts > 0) rows.push({ n: '—', data: DATA_BANCO, tipo: 'FGTS', nom: fgts, cor: fgts, fase: 'Sem correção' });
   rows.sort((a, b) => a.data - b.data);
   return { parcela, balao, rows, totalCor };
 }
@@ -437,7 +439,8 @@ function calcular() {
 
   const sinal = Math.max(+$('sinal').value || 0, 0);
   $('sinalPct').textContent = `${pct(sinal / venda, 2)} do valor de venda · tabela: 2%`;
-  const entrada = venda - fin, pEnt = entrada / venda, saldo = entrada - sinal;
+  const fgts = Math.max(+$('fgts').value || 0, 0);
+  const entrada = venda - fin, pEnt = entrada / venda, saldo = entrada - sinal - fgts;
 
   $('entPct').textContent = pct(pEnt, 2);
   $('entVal').textContent = brl(entrada);
@@ -447,7 +450,7 @@ function calcular() {
   $('entChip').innerHTML = acima ? '<span class="chip warn">Acima de 20% · precisa de aprovação do gerente</span>'
     : '<span class="chip ok">Até 20% · dentro do permitido</span>';
   if (!renda) alerts.push('Informe a renda do cliente para validar os limites de parcela e balão.');
-  if (saldo < 0) alerts.push('O sinal é maior que a entrada. Reduza o sinal ou o valor financiado.');
+  if (saldo < 0) alerts.push('Sinal e FGTS somam mais que a entrada. Reduza um deles ou o valor financiado.');
   $('alerts').innerHTML = alerts.map(a => `<li>${a}</li>`).join('');
 
   if (saldo < 0) { $('props').innerHTML = ''; return; }
@@ -467,7 +470,7 @@ function calcular() {
 
   const res = (st.baloes ? [0, st.tipoB] : [0]).map(i => {
     const p = PROPOSTAS[i];
-    const r = montarFluxo(p, saldo, sinal, fin, d0, valorB, incc, ipca);
+    const r = montarFluxo(p, saldo, sinal, fin, fgts, d0, valorB, incc, ipca);
     r.okParc = renda > 0 && r.parcela >= 0 && r.parcela <= renda * LIM_PARC + 0.005;
     r.okBalao = !p.baloes.length || (renda > 0 && r.balao <= renda * LIM_BALAO + 0.005);
     return { ...p, ...r, i };
@@ -489,13 +492,13 @@ function calcular() {
   }).join('');
 
   const p = res.find(r => r.i === st.prop) || res[0];
-  desenharFluxo(p, { venda, aval: u[4], sinal, fin, d0, renda });
+  desenharFluxo(p, { venda, aval: u[4], sinal, fin, fgts, d0, renda });
 }
 
 // ---------- 4 · Fluxo ----------
 // Bom pagador = avaliação − venda. Só vale quando o financiamento passa de 80% da venda
 // (e fica até 80% da avaliação, garantido pelo teto). Aí o valor do imóvel passa a ser a avaliação.
-function condicaoVenda(p, { venda, aval, sinal, fin, d0 }) {
+function condicaoVenda(p, { venda, aval, sinal, fin, fgts, d0 }) {
   const bomPagador = fin > venda * LTV + 0.01 ? aval - venda : 0;
   const nb = p.baloes.length;
   const linhas = [
@@ -503,6 +506,7 @@ function condicaoVenda(p, { venda, aval, sinal, fin, d0 }) {
     { i: 2, tipo: 'Parcelas', qte: MESES, venc: addMes(d0, 1), valor: r2(p.parcela), obs: 'INCC até entrega, IPCA+1% após' },
     bomPagador > 0 && { i: 3, tipo: 'Bom pagador', qte: 1, venc: null, valor: r2(bomPagador), obs: 'Avaliação − venda' },
     nb && { i: 4, tipo: 'Balões', qte: nb, venc: addMes(d0, p.baloes[0]), valor: r2(p.balao), obs: nb === 2 ? 'Anuais' : 'Semestrais' },
+    fgts > 0 && { i: 5, tipo: 'FGTS', qte: 1, venc: DATA_BANCO, valor: fgts, obs: 'Liberado na assinatura' },
     { i: 6, tipo: 'Banco', qte: 1, venc: DATA_BANCO, valor: fin, obs: 'Caixa' },
   ].filter(Boolean);
   return { valorImovel: bomPagador > 0 ? aval : venda, bomPagador, linhas };
@@ -511,10 +515,10 @@ function condicaoVenda(p, { venda, aval, sinal, fin, d0 }) {
 const isoData = d => d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` : '';
 const moeda = v => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-function desenharFluxo(p, { venda, aval, sinal, fin, d0, renda }) {
+function desenharFluxo(p, { venda, aval, sinal, fin, fgts, d0, renda }) {
   $('fluxoTitulo').textContent = `Fluxo · ${p.nome}`;
-  const cv = condicaoVenda(p, { venda, aval, sinal, fin, d0 });
-  const cls = { 'Balões': 'balao', 'Banco': 'banco', 'Bom pagador': 'bompag' };
+  const cv = condicaoVenda(p, { venda, aval, sinal, fin, fgts, d0 });
+  const cls = { 'Balões': 'balao', 'Banco': 'banco', 'FGTS': 'banco', 'Bom pagador': 'bompag' };
   $('condicao').innerHTML = `<tr><th>Tipo</th><th>Qtd</th><th>1º vencimento</th><th>Valor parcela</th><th>Total</th><th class="obs">Observações</th></tr>` +
     cv.linhas.map(l => `<tr class="${cls[l.tipo] || ''}"><td>${l.tipo}</td><td>${l.qte}</td><td>${l.venc ? dataBR(l.venc) : '—'}</td><td class="num">${brl(l.valor)}</td><td class="num">${brl(l.valor * l.qte)}</td><td class="obs">${l.obs}</td></tr>`).join('') +
     `<tr class="total"><td>Total</td><td></td><td></td><td></td><td class="num">${brl(cv.valorImovel)}</td><td class="obs">${cv.bomPagador ? 'Valor de avaliação (com bom pagador)' : 'Valor de venda'}</td></tr>`;
@@ -575,7 +579,7 @@ $('exportar').addEventListener('click', () => {
   if (!window.open(url, '_blank')) location.href = url;
 });
 $('finRange').addEventListener('input', e => { $('fin').value = e.target.value; calcular(); });
-['renda', 'sinal', 'fin', 'dataSinal', 'incc', 'ipca'].forEach(id => $(id).addEventListener('input', calcular));
+['renda', 'sinal', 'fgts', 'fin', 'dataSinal', 'incc', 'ipca'].forEach(id => $(id).addEventListener('input', calcular));
 
 $('dataSinal').value = new Date().toISOString().slice(0, 10);
 selecionar(U.find(u => u[0] === 1 && u[1] === 101));
