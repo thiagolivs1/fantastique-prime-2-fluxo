@@ -247,7 +247,7 @@ try {
   const m = location.hash.match(/^#fluxo=(.+)$/);
   if (m) {
     const d = JSON.parse(decodeURIComponent(m[1]));
-    for (const n of ["apto", "torre", "valor_imovel"]) document.querySelector(`[name="${n}"]`).value = d[n] || "";
+    for (const n of ["apto", "torre", "valor_imovel", "obs1", "obs2"]) document.querySelector(`[name="${n}"]`).value = d[n] || "";
     document.querySelectorAll("#cond input").forEach(f => f.value = "");
     for (const l of d.linhas)
       for (const c of ["qte", "venc", "valor", "total", "obs"])
@@ -354,7 +354,10 @@ async function gerar() {
 const nomeArquivo = () => "Proposta - " + (val("p_nome") || "sem nome") + ".pdf";
 
 async function comBlob(fn) {
-  const url = URL.createObjectURL(new Blob([await gerar()], { type: "application/pdf" }));
+  let bytes;
+  try { bytes = await gerar(); }
+  catch (e) { alert("Não foi possível gerar o PDF: " + e.message); throw e; }
+  const url = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
   try { fn(url); } finally { setTimeout(() => URL.revokeObjectURL(url), 60000); }
 }
 

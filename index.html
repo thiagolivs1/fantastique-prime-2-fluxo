@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=Instrument+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
+
   :root {
     --paper:#E8EBE7; --sheet:#F7F8F5; --ink:#1D2320; --mute:#5E6863; --line:#CBD1CC;
     --bronze:#9C6A3C; --espresso:#3B2A20; --ok:#2E7A57; --alert:#B8321F; --amber:#C98A12;
@@ -185,6 +186,29 @@
     .no-print, .prop[aria-pressed="false"] { display:none !important; }
     .step { border:0; padding:8px 0; break-inside:avoid; } .picker { grid-template-columns:1fr; }
   }
+
+  /* etapa 3 · editor do fluxo */
+  .editor { margin-top:14px; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; align-items:start; }
+  [hidden] { display:none !important; }   /* label.f é flex e ignoraria o atributo hidden */
+  .grp { display:grid; gap:12px; align-content:start; padding:16px; border:1px solid var(--line); border-radius:12px; background:#fff; }
+  .grp.full { grid-column:1 / -1; }
+  .grp h3 { margin:0; font:700 11px var(--mono); letter-spacing:.1em; text-transform:uppercase; color:var(--bronze); }
+  .linha { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; align-items:stretch; }
+  .linha label.f input { margin-top:auto; }
+  .sinais { display:grid; gap:10px; }
+  .sinal-row { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.15fr) 34px; gap:10px; align-items:end; }
+  .sinal-row .iconbtn { height:40px; }
+  .sinal-row .idx { font:11px var(--mono); color:var(--mute); }
+  @media (max-width:760px) { .editor { grid-template-columns:1fr; } .seg { flex-wrap:wrap; } .seg button { flex:1 1 45%; } }
+  @media (max-width:480px) { .sinal-row input[type=date] { padding:9px 4px; font-size:14px; } }
+  /* etapa 4 · descrição */
+  .descricao { margin:0 0 18px; padding:0 0 0 18px; display:grid; gap:7px; font-size:15px; }
+  .descricao li::marker { color:var(--bronze); }
+  /* etapa 5 · comparação */
+  .cmp-vazio { color:var(--mute); font-size:14px; }
+  #cmp td, #cmp th { font-size:13px; }
+  .iconbtn { border:0; background:none; padding:2px 6px; font:600 15px var(--body); color:var(--mute); cursor:pointer; }
+  .iconbtn:hover { color:var(--alert); }
 </style>
 </head>
 <body>
@@ -200,9 +224,10 @@
 
 <main>
   <noscript><p class="step" style="border-color:var(--alert)"><b>O simulador não carregou.</b> Este visualizador bloqueia JavaScript (comum na pré-visualização do WhatsApp, Arquivos do iPhone, Drive e e-mail). Abra o arquivo no Safari ou no Chrome.</p></noscript>
+
   <!-- 1 -->
   <section class="step" id="s1">
-    <h2><span class="n">1</span>Escolha a unidade</h2>
+    <h2><span class="n">1</span>Unidade</h2>
     <p class="lead no-print">Clique na coluna de uma torre (círculos verdes) e depois escolha o andar. Toque nos números laranja para ver a área de lazer.</p>
     <div class="implant no-print" id="implant">
       <div class="mapa">
@@ -221,24 +246,71 @@
 
   <!-- 2 -->
   <section class="step" id="s2">
-    <h2><span class="n">2</span>Cliente e financiamento</h2>
-    <p class="lead">O sinal e o FGTS abatem o que fica parcelado com a construtora. O parcelamento é que precisa ficar em até 20% do valor de venda.</p>
-    <div class="fields no-print">
-      <label class="f">Renda mensal do cliente <span>Base para os limites de parcela e balão</span><input id="renda" type="number" min="0" step="100" value="10000"></label>
-      <label class="f">Sinal (R$) <span id="sinalPct">Tabela: 2% do valor de venda</span><input id="sinal" type="number" min="0" step="100"></label>
-      <label class="f">Sinal em quantas vezes <span>1 = à vista. Parcelas mensais, sem correção</span><input id="sinalVezes" type="number" min="1" max="24" step="1" value="1"></label>
-      <label class="f">FGTS (R$) <span>Abate da entrada · liberado na assinatura com a Caixa</span><input id="fgts" type="number" min="0" step="100" value="0"></label>
-      <label class="f">Data do sinal <span>Parcelas começam no mês seguinte</span><input id="dataSinal" type="date"></label>
-    </div>
+    <h2><span class="n">2</span>Financiamento pela Caixa</h2>
+    <p class="lead">Começa com o padrão de 80% do valor de venda. Altere para o valor que a Caixa aprovou.</p>
     <div class="finbox">
       <div class="finrow">
-        <label class="f">Valor financiado pela Caixa
+        <label class="f" for="finRange">Valor financiado
           <span id="finCap"></span>
           <input id="finRange" type="range" min="0" step="100" class="no-print">
         </label>
         <input id="fin" type="number" min="0" step="100" aria-label="Valor financiado (R$)">
       </div>
-      <div class="gauge-wrap">
+      <div class="fields no-print" style="margin-top:16px">
+        <label class="f" for="renda">Renda mensal do cliente <span>Base para os limites de parcela e balão</span><input id="renda" type="number" min="0" step="100" value="10000"></label>
+      </div>
+      <ul class="alerts" id="alerts"></ul>
+    </div>
+  </section>
+
+  <!-- 3 -->
+  <section class="step" id="s3">
+    <h2><span class="n">3</span>Fluxo</h2>
+    <p class="lead">Escolha um fluxo sugerido ou mexa nos campos abaixo: qualquer mudança vira o cartão "Fluxo editado". Parcela até 30% da renda · cada balão até 90% da renda.</p>
+    <div class="props" id="fluxos"></div>
+    <div class="balarea no-print">
+      <div id="editor" class="editor">
+        <section class="grp">
+          <h3>Sinal</h3>
+          <div class="sinais" id="sinais"></div>
+          <div><button class="linkbtn" id="addSinal" type="button">+ Adicionar entrada de sinal</button></div>
+          <div class="under" id="sinalPct"></div>
+        </section>
+        <section class="grp">
+          <h3>Parcelas e FGTS</h3>
+          <div class="linha">
+            <label class="f" for="meses">Quantidade de parcelas <span id="mesesHint"></span><input id="meses" type="number" min="1" max="60" step="1" value="60"></label>
+            <label class="f" for="fgts">FGTS (R$) <span>Abate do parcelamento</span><input id="fgts" type="number" min="0" step="100" value="0"></label>
+          </div>
+        </section>
+        <section class="grp full">
+          <h3>Balões</h3>
+          <div class="seg" id="balTipo">
+            <button data-b="0" aria-pressed="true">Sem balões</button><button data-b="2" aria-pressed="false">2 anuais</button><button data-b="4" aria-pressed="false">4 semestrais</button><button data-b="x" aria-pressed="false">Outro</button>
+          </div>
+          <div class="under">Padrão: 2 balões anuais (meses 12 e 24) ou 4 semestrais (meses 6, 12, 18 e 24). Sair disso precisa de aprovação do gerente.</div>
+          <div class="linha">
+            <label class="f" id="balMesesWrap" for="balMeses" hidden>Meses dos balões <span>Ex.: 10, 20, 30</span><input id="balMeses" type="text" inputmode="numeric" value="12, 24"></label>
+            <label class="f" id="balWrap" for="valorBalao" hidden>Valor de cada balão (R$) <span id="balHint"></span><input id="valorBalao" type="number" min="0" step="100"></label>
+          </div>
+        </section>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4 -->
+  <section class="step" id="s4">
+    <div class="s4head">
+      <h2><span class="n">4</span><span id="fluxoTitulo">Resumo da proposta</span></h2>
+      <div class="actions no-print">
+        <button class="btn btn-alt" onclick="print()">Imprimir</button>
+        <button class="btn" id="exportar">Exportar para proposta</button>
+      </div>
+    </div>
+    <ul class="descricao" id="descricao"></ul>
+
+    <div class="finbox">
+      <div class="gauge-wrap" style="margin-top:0">
         <div class="gauge-head">
           <div><span class="under">Parcelado com a construtora</span><br><strong id="entPct">—</strong> <span class="num" id="entVal"></span></div>
           <span id="entChip"></span>
@@ -248,42 +320,7 @@
         <div class="row-between under" id="entResumo" style="margin-top:8px"></div>
         <div class="sugestao" id="sugestao" hidden></div>
       </div>
-      <ul class="alerts" id="alerts"></ul>
     </div>
-  </section>
-
-  <!-- 3 -->
-  <section class="step" id="s3">
-    <h2><span class="n">3</span>Compare as propostas</h2>
-    <p class="lead">Saldo da entrada em 60 meses. Parcela até 30% da renda · cada balão até 90% da renda. Clique numa proposta para ver o fluxo.</p>
-    <div class="balarea no-print">
-      <button id="balToggle" class="btn-ghost" aria-expanded="false" aria-controls="balPanel">+ Adicionar balões</button>
-      <div id="balPanel" class="balpanel" hidden>
-        <div>
-          <div class="under" style="margin-bottom:6px">Tipo de balão</div>
-          <div class="seg" id="balTipo">
-            <button data-b="1" aria-pressed="true">2 balões anuais</button><button data-b="2" aria-pressed="false">4 balões semestrais</button>
-          </div>
-        </div>
-        <label class="f">Valor de cada balão (R$)
-          <span id="balHint"></span>
-          <input id="valorBalao" type="number" min="0" step="100">
-        </label>
-      </div>
-    </div>
-    <div class="props" id="props"></div>
-  </section>
-
-  <!-- 4 -->
-  <section class="step" id="s4">
-    <div class="s4head">
-      <h2><span class="n">4</span><span id="fluxoTitulo">Fluxo de pagamento</span></h2>
-      <div class="actions no-print">
-        <button class="btn btn-alt" onclick="print()">Imprimir</button>
-        <button class="btn" id="exportar">Exportar para proposta</button>
-      </div>
-    </div>
-    <p class="lead">Valores de tabela na condição de venda. Gráfico e extrato mostram a projeção com correção.</p>
 
     <div class="wrap"><table id="condicao"></table></div>
 
@@ -296,9 +333,9 @@
     </div>
 
     <div class="premissas no-print">
-      <label class="f">INCC projetado <span>% ao ano</span><input id="incc" type="number" step="0.1" value="6"></label>
-      <label class="f">IPCA projetado <span>% ao ano</span><input id="ipca" type="number" step="0.1" value="4.5"></label>
-      <span class="under" style="flex:1;min-width:220px">Índices futuros são estimativa. Após a entrega soma-se 1% ao mês ao IPCA. O sinal não é corrigido.</span>
+      <label class="f" for="incc">INCC projetado <span>% ao ano</span><input id="incc" type="number" step="0.1" value="6"></label>
+      <label class="f" for="ipca">IPCA projetado <span>% ao ano</span><input id="ipca" type="number" step="0.1" value="4.5"></label>
+      <span class="under" style="flex:1;min-width:220px">Índices futuros são estimativa. Planos de até 24 parcelas são fixos, sem correção. O sinal e o FGTS nunca são corrigidos.</span>
     </div>
 
     <details>
@@ -306,19 +343,30 @@
       <div class="wrap"><table id="extrato"></table></div>
     </details>
   </section>
+
+  <!-- 5 -->
+  <section class="step" id="s5">
+    <div class="s4head">
+      <h2><span class="n">5</span>Comparar unidades</h2>
+      <div class="actions no-print"><button class="btn btn-alt" id="cmpAdd">Guardar esta simulação</button></div>
+    </div>
+    <p class="lead">Guarde quantas simulações quiser e compare lado a lado antes de decidir.</p>
+    <p class="cmp-vazio" id="cmpVazio">Nenhuma simulação guardada ainda.</p>
+    <div class="wrap"><table id="cmp"></table></div>
+  </section>
 </main>
 
 <script>
 // [torre, unidade, área m², valor de venda, valor de avaliação, reservada] — Tabela 60X Lançamento Prime II (21/08/2026)
 const U = [[1,1,68.4,360000.0,389000.0,0],[1,2,76.51,330000.0,368000.0,0],[1,3,76.15,330000.0,367000.0,0],[1,4,68.4,360000.0,389000.0,0],[1,5,68.4,360000.0,389000.0,0],[1,6,76.4,330000.0,368000.0,0],[1,7,76.75,330000.0,0.0,0],[1,8,68.4,360000.0,389000.0,0],[1,101,59.93,348382.0,374487.24,0],[1,102,51.66,294532.0,344407.94,0],[1,103,51.66,294532.0,344407.94,0],[1,104,59.93,345032.0,374487.24,0],[1,105,59.93,334982.0,374487.24,0],[1,106,51.66,287995.0,344407.94,0],[1,107,51.66,287995.0,344407.94,0],[1,108,59.93,340007.0,374487.24,0],[1,201,59.93,353868.0,389526.88,0],[1,202,51.66,299170.0,359000.0,0],[1,203,51.66,299170.0,359000.0,0],[1,204,59.93,350465.0,389526.88,0],[1,205,59.93,340258.0,389526.88,0],[1,206,51.66,293304.0,359000.0,0],[1,207,51.66,293304.0,359000.0,0],[1,208,59.93,345361.0,389526.88,0],[1,301,59.93,359354.0,404566.53,0],[1,302,51.66,303808.0,365000.0,0],[1,303,51.66,303808.0,365000.0,0],[1,304,59.93,355899.0,404566.53,0],[1,305,59.93,345533.0,404566.53,0],[1,306,51.66,297851.0,365000.0,0],[1,307,51.66,297851.0,365000.0,0],[1,308,59.93,350716.0,404566.53,0],[1,401,59.93,364840.0,414000.0,0],[1,402,51.66,308447.0,372000.0,0],[1,403,51.66,308447.0,372000.0,0],[1,404,59.93,361332.0,414000.0,0],[1,405,59.93,350808.0,414000.0,0],[1,406,51.66,302399.0,372000.0,0],[1,407,51.66,302399.0,372000.0,0],[1,408,59.93,356070.0,414000.0,0],[1,501,59.93,370327.0,422000.0,0],[1,502,51.66,313085.0,379000.0,0],[1,503,51.66,313085.0,379000.0,0],[1,504,59.93,366766.0,422000.0,0],[1,505,59.93,356083.0,422000.0,0],[1,506,51.66,306946.0,379000.0,0],[1,507,51.66,306946.0,379000.0,0],[1,508,59.93,361425.0,422000.0,0],[1,601,59.93,375813.0,430000.0,0],[1,602,51.66,317723.0,386000.0,0],[1,603,51.66,317723.0,386000.0,0],[1,604,59.93,372200.0,430000.0,0],[1,605,59.93,361359.0,430000.0,0],[1,606,51.66,311493.0,386000.0,0],[1,607,51.66,311493.0,386000.0,0],[1,608,59.93,366779.0,430000.0,0],[1,701,59.93,381299.0,438000.0,0],[1,702,51.66,322361.0,394000.0,0],[1,703,51.66,322361.0,394000.0,0],[1,704,59.93,377633.0,438000.0,0],[1,705,59.93,366634.0,438000.0,0],[1,706,51.66,316041.0,394000.0,0],[1,707,51.66,316041.0,394000.0,0],[1,708,59.93,372134.0,438000.0,0],[1,801,59.93,386786.0,447000.0,0],[1,802,51.66,327000.0,402000.0,0],[1,803,51.66,327000.0,402000.0,0],[1,804,59.93,383067.0,447000.0,0],[1,805,59.93,371909.0,447000.0,0],[1,806,51.66,320588.0,402000.0,0],[1,807,51.66,320588.0,402000.0,0],[1,808,59.93,377488.0,447000.0,0],[1,901,59.93,392272.0,457000.0,0],[1,902,51.66,331638.0,411000.0,0],[1,903,51.66,331638.0,411000.0,0],[1,904,59.93,388500.0,457000.0,0],[1,905,59.93,377185.0,457000.0,0],[1,906,51.66,325135.0,411000.0,0],[1,907,51.66,325135.0,411000.0,0],[1,908,59.93,382842.0,457000.0,0],[1,1001,59.93,397758.0,467000.0,0],[1,1002,51.66,336276.0,420000.0,0],[1,1003,51.66,336276.0,420000.0,0],[1,1004,59.93,393934.0,467000.0,1],[1,1005,59.93,382460.0,467000.0,0],[1,1006,51.66,329683.0,420000.0,0],[1,1007,51.66,329683.0,420000.0,0],[1,1008,59.93,388197.0,467000.0,0],[1,1101,59.93,403245.0,477000.0,0],[1,1102,51.66,340915.0,425880.0,0],[1,1103,51.66,340915.0,425880.0,0],[1,1104,59.93,399367.0,477000.0,0],[1,1105,59.93,387735.0,477000.0,0],[1,1106,51.66,334230.0,425880.0,0],[1,1107,51.66,334230.0,425880.0,0],[1,1108,59.93,393551.0,477000.0,0],[1,1201,59.93,408731.0,486720.0,0],[1,1202,51.66,345553.0,432640.0,0],[1,1203,51.66,345553.0,432640.0,0],[1,1204,59.93,404801.0,486720.0,0],[1,1205,59.93,393011.0,486720.0,0],[1,1206,51.66,338777.0,432640.0,0],[1,1207,51.66,338777.0,432640.0,0],[1,1208,59.93,398906.0,486720.0,0],[1,1301,59.93,414217.0,492128.0,0],[1,1302,51.66,350191.0,438048.0,0],[1,1303,51.66,350191.0,438048.0,0],[1,1304,59.93,410235.0,492128.0,0],[1,1305,59.93,398286.0,492128.0,0],[1,1306,51.66,343325.0,438048.0,0],[1,1307,51.66,343325.0,438048.0,0],[1,1308,59.93,404260.0,492128.0,0],[1,1401,59.93,419704.0,497536.0,0],[1,1402,51.66,354830.0,443456.0,0],[1,1403,51.66,354830.0,443456.0,0],[1,1404,59.93,415668.0,497536.0,0],[1,1405,59.93,403561.0,497536.0,0],[1,1406,51.66,347872.0,443456.0,0],[1,1407,51.66,347872.0,443456.0,0],[1,1408,59.93,409615.0,497536.0,0],[1,1501,59.93,425190.0,504296.0,0],[1,1502,51.66,359468.0,448864.0,0],[1,1503,51.66,359468.0,448864.0,0],[1,1504,59.93,421102.0,504296.0,0],[1,1505,59.93,408837.0,504296.0,0],[1,1506,51.66,352419.0,448864.0,0],[1,1507,51.66,352419.0,448864.0,0],[1,1508,59.93,414969.0,504296.0,0],[1,1601,59.93,430676.0,509704.0,0],[1,1602,51.66,364106.0,455624.0,0],[1,1603,51.66,364106.0,455624.0,0],[1,1604,59.93,426535.0,509704.0,0],[1,1605,59.93,414112.0,509704.0,0],[1,1606,51.66,356967.0,455624.0,0],[1,1607,51.66,356967.0,455624.0,0],[1,1608,59.93,420324.0,509704.0,0],[1,1701,59.93,436163.0,515112.0,0],[1,1702,51.66,368744.0,461032.0,0],[1,1703,51.66,368744.0,461032.0,0],[1,1704,59.93,431969.0,515112.0,0],[1,1705,59.93,419387.0,515112.0,0],[1,1706,51.66,361514.0,461032.0,0],[1,1707,51.66,361514.0,461032.0,0],[1,1708,59.93,425678.0,515112.0,0],[2,1,68.4,360000.0,389000.0,0],[2,2,76.51,330000.0,368000.0,0],[2,3,76.15,330000.0,367000.0,0],[2,4,68.4,360000.0,389000.0,0],[2,5,68.4,360000.0,389000.0,0],[2,6,76.4,330000.0,368000.0,0],[2,7,76.75,330000.0,368000.0,0],[2,8,68.4,360000.0,389000.0,0],[2,101,59.93,348382.0,374487.24,0],[2,102,51.66,294532.0,344407.94,0],[2,103,51.66,294532.0,344407.94,0],[2,104,59.93,345032.0,374487.24,0],[2,105,59.93,334982.0,374487.24,0],[2,106,51.66,287995.0,344407.94,0],[2,107,51.66,287995.0,344407.94,0],[2,108,59.93,340007.0,374487.24,0],[2,201,59.93,353868.0,389526.88,0],[2,202,51.66,299170.0,359000.0,0],[2,203,51.66,299170.0,359000.0,0],[2,204,59.93,350465.0,389526.88,0],[2,205,59.93,340258.0,389526.88,0],[2,206,51.66,293304.0,359000.0,0],[2,207,51.66,293304.0,359000.0,0],[2,208,59.93,345361.0,389526.88,0],[2,301,59.93,359354.0,404566.53,0],[2,302,51.66,303808.0,365000.0,0],[2,303,51.66,303808.0,365000.0,0],[2,304,59.93,355899.0,404566.53,0],[2,305,59.93,345533.0,404566.53,0],[2,306,51.66,297851.0,365000.0,0],[2,307,51.66,297851.0,365000.0,0],[2,308,59.93,350716.0,404566.53,0],[2,401,59.93,364840.0,414000.0,0],[2,402,51.66,308447.0,372000.0,0],[2,403,51.66,308447.0,372000.0,0],[2,404,59.93,361332.0,414000.0,0],[2,405,59.93,350808.0,414000.0,0],[2,406,51.66,302399.0,372000.0,0],[2,407,51.66,302399.0,372000.0,0],[2,408,59.93,356070.0,414000.0,0],[2,501,59.93,370327.0,422000.0,0],[2,502,51.66,313085.0,379000.0,0],[2,503,51.66,313085.0,379000.0,0],[2,504,59.93,366766.0,422000.0,0],[2,505,59.93,356083.0,422000.0,0],[2,506,51.66,306946.0,379000.0,0],[2,507,51.66,306946.0,379000.0,0],[2,508,59.93,361425.0,422000.0,0],[2,601,59.93,375813.0,430000.0,0],[2,602,51.66,317723.0,386000.0,0],[2,603,51.66,317723.0,386000.0,0],[2,604,59.93,372200.0,430000.0,0],[2,605,59.93,361359.0,430000.0,0],[2,606,51.66,311493.0,386000.0,0],[2,607,51.66,311493.0,386000.0,0],[2,608,59.93,366779.0,430000.0,0],[2,701,59.93,381299.0,438000.0,0],[2,702,51.66,322361.0,394000.0,0],[2,703,51.66,322361.0,394000.0,0],[2,704,59.93,377633.0,438000.0,0],[2,705,59.93,366634.0,438000.0,0],[2,706,51.66,316041.0,394000.0,0],[2,707,51.66,316041.0,394000.0,0],[2,708,59.93,372134.0,438000.0,0],[2,801,59.93,386786.0,447000.0,0],[2,802,51.66,327000.0,402000.0,0],[2,803,51.66,327000.0,402000.0,0],[2,804,59.93,383067.0,447000.0,0],[2,805,59.93,371909.0,447000.0,0],[2,806,51.66,320588.0,402000.0,0],[2,807,51.66,320588.0,402000.0,0],[2,808,59.93,377488.0,447000.0,0],[2,901,59.93,392272.0,457000.0,0],[2,902,51.66,331638.0,411000.0,0],[2,903,51.66,331638.0,411000.0,0],[2,904,59.93,388500.0,457000.0,0],[2,905,59.93,377185.0,457000.0,0],[2,906,51.66,325135.0,411000.0,0],[2,907,51.66,325135.0,411000.0,0],[2,908,59.93,382842.0,457000.0,0],[2,1001,59.93,397758.0,467000.0,0],[2,1002,51.66,336276.0,420000.0,0],[2,1003,51.66,336276.0,420000.0,0],[2,1004,59.93,393934.0,467000.0,0],[2,1005,59.93,382460.0,467000.0,0],[2,1006,51.66,329683.0,420000.0,0],[2,1007,51.66,329683.0,420000.0,0],[2,1008,59.93,388197.0,467000.0,0],[2,1101,59.93,403245.0,477000.0,0],[2,1102,51.66,340915.0,425880.0,0],[2,1103,51.66,340915.0,425880.0,0],[2,1104,59.93,399367.0,477000.0,0],[2,1105,59.93,387735.0,477000.0,0],[2,1106,51.66,334230.0,425880.0,0],[2,1107,51.66,334230.0,425880.0,0],[2,1108,59.93,393551.0,477000.0,0],[2,1201,59.93,408731.0,486720.0,0],[2,1202,51.66,345553.0,432640.0,0],[2,1203,51.66,345553.0,432640.0,0],[2,1204,59.93,404801.0,486720.0,0],[2,1205,59.93,393011.0,486720.0,0],[2,1206,51.66,338777.0,432640.0,0],[2,1207,51.66,338777.0,432640.0,0],[2,1208,59.93,398906.0,486720.0,0],[2,1301,59.93,414217.0,492128.0,0],[2,1302,51.66,350191.0,438048.0,0],[2,1303,51.66,350191.0,438048.0,0],[2,1304,59.93,410235.0,492128.0,0],[2,1305,59.93,398286.0,492128.0,0],[2,1306,51.66,343325.0,438048.0,0],[2,1307,51.66,343325.0,438048.0,0],[2,1308,59.93,404260.0,492128.0,0],[2,1401,59.93,419704.0,497536.0,0],[2,1402,51.66,354830.0,443456.0,0],[2,1403,51.66,354830.0,443456.0,0],[2,1404,59.93,415668.0,497536.0,0],[2,1405,59.93,403561.0,497536.0,0],[2,1406,51.66,347872.0,443456.0,0],[2,1407,51.66,347872.0,443456.0,0],[2,1408,59.93,409615.0,497536.0,0],[2,1501,59.93,425190.0,504296.0,0],[2,1502,51.66,359468.0,448864.0,0],[2,1503,51.66,359468.0,448864.0,0],[2,1504,59.93,421102.0,504296.0,0],[2,1505,59.93,408837.0,504296.0,0],[2,1506,51.66,352419.0,448864.0,0],[2,1507,51.66,352419.0,448864.0,0],[2,1508,59.93,414969.0,504296.0,0],[2,1601,59.93,430676.0,509704.0,0],[2,1602,51.66,364106.0,455624.0,0],[2,1603,51.66,364106.0,455624.0,0],[2,1604,59.93,426535.0,509704.0,0],[2,1605,59.93,414112.0,509704.0,0],[2,1606,51.66,356967.0,455624.0,0],[2,1607,51.66,356967.0,455624.0,0],[2,1608,59.93,420324.0,509704.0,0],[2,1701,59.93,436163.0,515112.0,0],[2,1702,51.66,368744.0,461032.0,0],[2,1703,51.66,368744.0,461032.0,0],[2,1704,59.93,431969.0,515112.0,0],[2,1705,59.93,419387.0,515112.0,0],[2,1706,51.66,361514.0,461032.0,0],[2,1707,51.66,361514.0,461032.0,0],[2,1708,59.93,425678.0,515112.0,0],[3,1,68.4,360000.0,389000.0,0],[3,2,76.51,330000.0,368000.0,0],[3,3,76.15,330000.0,368000.0,0],[3,4,68.4,360000.0,389000.0,0],[3,5,68.4,360000.0,389000.0,0],[3,6,76.4,330000.0,368000.0,0],[3,7,76.75,330000.0,368000.0,0],[3,8,68.4,360000.0,389000.0,0],[3,101,59.93,348382.0,374487.24,0],[3,102,51.66,294532.0,344407.94,0],[3,103,51.66,294532.0,344407.94,0],[3,104,59.93,345032.0,374487.24,0],[3,105,59.93,334982.0,374487.24,0],[3,106,51.66,287995.0,344407.94,0],[3,107,51.66,287995.0,344407.94,0],[3,108,59.93,340007.0,374487.24,0],[3,201,59.93,353868.0,389526.88,0],[3,202,51.66,299170.0,359000.0,0],[3,203,51.66,299170.0,359000.0,0],[3,204,59.93,350465.0,389526.88,0],[3,205,59.93,340258.0,389526.88,0],[3,206,51.66,293304.0,359000.0,0],[3,207,51.66,293304.0,359000.0,0],[3,208,59.93,345361.0,389526.88,0],[3,301,59.93,359354.0,404566.53,0],[3,302,51.66,303808.0,365000.0,0],[3,303,51.66,303808.0,365000.0,0],[3,304,59.93,355899.0,404566.53,0],[3,305,59.93,345533.0,404566.53,0],[3,306,51.66,297851.0,365000.0,0],[3,307,51.66,297851.0,365000.0,0],[3,308,59.93,350716.0,404566.53,0],[3,401,59.93,364840.0,414000.0,0],[3,402,51.66,308447.0,372000.0,0],[3,403,51.66,308447.0,372000.0,0],[3,404,59.93,361332.0,414000.0,0],[3,405,59.93,350808.0,414000.0,0],[3,406,51.66,302399.0,372000.0,0],[3,407,51.66,302399.0,372000.0,0],[3,408,59.93,356070.0,414000.0,0],[3,501,59.93,370327.0,422000.0,0],[3,502,51.66,313085.0,379000.0,0],[3,503,51.66,313085.0,379000.0,0],[3,504,59.93,366766.0,422000.0,0],[3,505,59.93,356083.0,422000.0,0],[3,506,51.66,306946.0,379000.0,0],[3,507,51.66,306946.0,379000.0,0],[3,508,59.93,361425.0,422000.0,0],[3,601,59.93,375813.0,430000.0,0],[3,602,51.66,317723.0,386000.0,0],[3,603,51.66,317723.0,386000.0,0],[3,604,59.93,372200.0,430000.0,0],[3,605,59.93,361359.0,430000.0,0],[3,606,51.66,311493.0,386000.0,0],[3,607,51.66,311493.0,386000.0,0],[3,608,59.93,366779.0,430000.0,0],[3,701,59.93,381299.0,438000.0,0],[3,702,51.66,322361.0,394000.0,0],[3,703,51.66,322361.0,394000.0,0],[3,704,59.93,377633.0,438000.0,0],[3,705,59.93,366634.0,438000.0,0],[3,706,51.66,316041.0,394000.0,0],[3,707,51.66,316041.0,394000.0,0],[3,708,59.93,372134.0,438000.0,0],[3,801,59.93,386786.0,447000.0,0],[3,802,51.66,327000.0,402000.0,0],[3,803,51.66,327000.0,402000.0,0],[3,804,59.93,383067.0,447000.0,0],[3,805,59.93,371909.0,447000.0,0],[3,806,51.66,320588.0,402000.0,0],[3,807,51.66,320588.0,402000.0,0],[3,808,59.93,377488.0,447000.0,0],[3,901,59.93,392272.0,457000.0,0],[3,902,51.66,331638.0,411000.0,0],[3,903,51.66,331638.0,411000.0,0],[3,904,59.93,388500.0,457000.0,0],[3,905,59.93,377185.0,457000.0,0],[3,906,51.66,325135.0,411000.0,0],[3,907,51.66,325135.0,411000.0,0],[3,908,59.93,382842.0,457000.0,0],[3,1001,59.93,397758.0,467000.0,0],[3,1002,51.66,336276.0,420000.0,0],[3,1003,51.66,336276.0,420000.0,0],[3,1004,59.93,393934.0,467000.0,0],[3,1005,59.93,382460.0,467000.0,0],[3,1006,51.66,329683.0,420000.0,0],[3,1007,51.66,329683.0,420000.0,0],[3,1008,59.93,388197.0,467000.0,0],[3,1101,59.93,403245.0,477000.0,0],[3,1102,51.66,340915.0,425880.0,0],[3,1103,51.66,340915.0,425880.0,0],[3,1104,59.93,399367.0,477000.0,0],[3,1105,59.93,387735.0,477000.0,0],[3,1106,51.66,334230.0,425880.0,0],[3,1107,51.66,334230.0,425880.0,0],[3,1108,59.93,393551.0,477000.0,0],[3,1201,59.93,408731.0,486720.0,0],[3,1202,51.66,345553.0,432640.0,0],[3,1203,51.66,345553.0,432640.0,0],[3,1204,59.93,404801.0,486720.0,0],[3,1205,59.93,393011.0,486720.0,0],[3,1206,51.66,338777.0,432640.0,0],[3,1207,51.66,338777.0,432640.0,0],[3,1208,59.93,398906.0,486720.0,0],[3,1301,59.93,414217.0,492128.0,0],[3,1302,51.66,350191.0,438048.0,0],[3,1303,51.66,350191.0,438048.0,0],[3,1304,59.93,410235.0,492128.0,0],[3,1305,59.93,398286.0,492128.0,0],[3,1306,51.66,343325.0,438048.0,0],[3,1307,51.66,343325.0,438048.0,0],[3,1308,59.93,404260.0,492128.0,0],[3,1401,59.93,419704.0,497536.0,0],[3,1402,51.66,354830.0,443456.0,0],[3,1403,51.66,354830.0,443456.0,0],[3,1404,59.93,415668.0,497536.0,0],[3,1405,59.93,403561.0,497536.0,0],[3,1406,51.66,347872.0,443456.0,0],[3,1407,51.66,347872.0,443456.0,0],[3,1408,59.93,409615.0,497536.0,0],[3,1501,59.93,425190.0,504296.0,0],[3,1502,51.66,359468.0,448864.0,0],[3,1503,51.66,359468.0,448864.0,0],[3,1504,59.93,421102.0,504296.0,0],[3,1505,59.93,408837.0,504296.0,0],[3,1506,51.66,352419.0,448864.0,0],[3,1507,51.66,352419.0,448864.0,0],[3,1508,59.93,414969.0,504296.0,0],[3,1601,59.93,430676.0,509704.0,0],[3,1602,51.66,364106.0,455624.0,0],[3,1603,51.66,364106.0,455624.0,0],[3,1604,59.93,426535.0,509704.0,0],[3,1605,59.93,414112.0,509704.0,0],[3,1606,51.66,356967.0,455624.0,0],[3,1607,51.66,356967.0,455624.0,0],[3,1608,59.93,420324.0,509704.0,0],[3,1701,59.93,436163.0,515112.0,0],[3,1702,51.66,368744.0,461032.0,0],[3,1703,51.66,368744.0,461032.0,0],[3,1704,59.93,431969.0,515112.0,0],[3,1705,59.93,419387.0,515112.0,0],[3,1706,51.66,361514.0,461032.0,0],[3,1707,51.66,361514.0,461032.0,0],[3,1708,59.93,425678.0,515112.0,0]];
 
-const MESES = 60, LIM_PARC = 0.30, LIM_BALAO = 0.90, ENT_MAX = 0.20, LTV = 0.80, JUROS_POS = 0.01;
+const MAX_PARC = 60, FIXO_ATE = 24, LIM_PARC = 0.30, LIM_BALAO = 0.90, ENT_MAX = 0.20, LTV = 0.80, JUROS_POS = 0.01;
 const ENTREGA_IDX = 2029 * 12 + 7;              // agosto/2029
 const DATA_BANCO = new Date(2029, 7, 30);
-const PROPOSTAS = [
-  { nome: 'Linear', desc: 'Só parcelas mensais iguais', baloes: [] },
-  { nome: '2 balões anuais', desc: '1 balão por ano · meses 12 e 24', baloes: [12, 24] },
-  { nome: '4 balões semestrais', desc: '1 balão a cada 6 meses · meses 6, 12, 18 e 24', baloes: [6, 12, 18, 24] },
+const BALOES = { 0: { meses: [], nome: 'Sem balões' }, 2: { meses: [12, 24], nome: '2 balões anuais' }, 4: { meses: [6, 12, 18, 24], nome: '4 balões semestrais' } };
+const SUGESTOES = [
+  { meses: 60, nome: '60 meses', desc: 'Padrão da tabela. Corrigidas pelo INCC até a entrega e IPCA + 1% a.m. depois.' },
+  { meses: 24, nome: '24 meses', desc: 'Parcelas fixas: até 24 parcelas não têm INCC nem IPCA + 1%.' },
 ];
 
 const $ = id => document.getElementById(id);
@@ -328,8 +376,15 @@ const m2 = v => v.toLocaleString('pt-BR') + ' m²';
 const dataBR = d => d.toLocaleDateString('pt-BR');
 const addMes = (d, n) => { const y = d.getFullYear(), m = d.getMonth() + n; return new Date(y, m, Math.min(d.getDate(), new Date(y, m + 1, 0).getDate())); };
 const r2 = v => Math.round(v * 100) / 100;
+// o PDF da proposta usa Times (WinAnsi) e quebra em traços/aspas tipográficas
+const limpar = t => String(t).replace(/[\u2212\u2013\u2014]/g, '-').replace(/[\u2018\u2019]/g, "'").replace(/[\u201C\u201D]/g, '"').replace(/\u2026/g, '...');
+const isoData = d => d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` : '';
+const moeda = v => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-const st = { unit: null, col: null, prop: 0, baloes: false, tipoB: 1, valorB: null }; // valorB null = sugestão automática
+const hojeISO = () => new Date().toISOString().slice(0, 10);
+// sinais: uma ou mais entradas {valor, data}. tipoB 'x' = balões fora do padrão (exceção).
+const dataDe = iso => { const [y, mo, d] = (iso || hojeISO()).split('-').map(Number); return new Date(y, mo - 1, d); };
+const st = { unit: null, col: null, sinais: [], sinalCustom: false, tipoB: 0, mesesBalao: [12, 24], valorB: null, comparar: [], export: null };
 
 // ---------- 1 · Implantação ----------
 // Coordenadas em px da arte original 1280×822; a imagem embutida é o recorte abaixo (sem a legenda)
@@ -379,9 +434,11 @@ function desenharColuna() {
 }
 
 function selecionar(u) {
-  st.unit = u; st.col = { t: u[0], c: colunaDe(u) }; st.valorB = null;
-  $('sinal').value = r2(u[3] * 0.02);
-  if ($('fin').value === '') $('fin').value = r2(Math.min(u[4] * LTV, u[3] * LTV)); // financiamento, FGTS e renda seguem entre unidades
+  st.unit = u; st.col = { t: u[0], c: colunaDe(u) }; st.valorB = null; st.sinalCustom = false;
+  st.sinais = [{ valor: r2(u[3] * 0.02), data: st.sinais.length ? st.sinais[0].data : hojeISO() }];
+  renderSinais();
+  // financiamento começa no padrão de 80% da venda; FGTS e renda seguem entre unidades
+  $('fin').value = r2(Math.min(u[4] * LTV, u[3] * LTV));
   desenharColuna();
   $('unit').innerHTML = `
     <div class="eyebrow">Torre ${u[0]} · Unidade ${u[1]} · ${m2(u[2])}</div>
@@ -396,225 +453,335 @@ function selecionar(u) {
   calcular();
 }
 
-document.addEventListener('click', e => {
-  const lz = e.target.closest('.lz');
-  document.querySelectorAll('.lz.open').forEach(b => b !== lz && b.classList.remove('open'));
-  if (lz) lz.classList.toggle('open');
-});
 $('pins').addEventListener('click', e => {
   const p = e.target.closest('.pin'); if (!p) return;
   st.col = { t: +p.dataset.t, c: +p.dataset.c };
   desenharColuna();
   $('andares').scrollIntoView({ block: 'nearest' });
 });
+document.addEventListener('click', e => {
+  const lz = e.target.closest('.lz');
+  document.querySelectorAll('.lz.open').forEach(b => b !== lz && b.classList.remove('open'));
+  if (lz) lz.classList.toggle('open');
+});
 $('andares').addEventListener('click', e => { const b = e.target.closest('.andar'); if (b) selecionar(U[b.dataset.i]); });
 
 // ---------- Cálculo ----------
-function montarFluxo(p, saldo, sinal, vezes, fin, fgts, d0, valorB, incc, ipca) {
-  const nb = p.baloes.length, balao = nb ? valorB : 0;
-  const parcela = (saldo - balao * nb) / MESES;
-  const rows = Array.from({ length: vezes }, (_, k) => ({
-    n: k ? `S${k + 1}` : 0, data: addMes(d0, k), tipo: vezes > 1 ? `Sinal ${k + 1}/${vezes}` : 'Sinal',
-    nom: sinal / vezes, cor: sinal / vezes, fase: 'Sem correção',
-  }));
-  let f = 1;
-  for (let m = 1; m <= MESES; m++) {
-    const d = addMes(d0, m), pos = d.getFullYear() * 12 + d.getMonth() > ENTREGA_IDX;
-    f *= pos ? (1 + ipca) * (1 + JUROS_POS) : 1 + incc;
-    const fase = pos ? 'IPCA + 1%' : 'INCC';
-    rows.push({ n: m, data: d, tipo: 'Parcela', nom: parcela, cor: parcela * f, fase, pos });
-    if (p.baloes.includes(m)) rows.push({ n: m, data: d, tipo: 'Balão', nom: balao, cor: balao * f, fase, pos });
-  }
-  const totalCor = rows.reduce((s, r) => s + r.cor, 0);
-  rows.push({ n: '—', data: DATA_BANCO, tipo: 'Financiamento Caixa', nom: fin, cor: fin, fase: 'Banco' });
-  if (fgts > 0) rows.push({ n: '—', data: DATA_BANCO, tipo: 'FGTS', nom: fgts, cor: fgts, fase: 'Sem correção' });
-  rows.sort((a, b) => a.data - b.data);
-  return { parcela, balao, rows, totalCor };
+function config() {
+  const u = st.unit, venda = u[3];
+  const renda = Math.max(+$('renda').value || 0, 0);
+  const cap = r2(Math.min(u[4] * LTV, venda));
+  let fin = Math.max(+$('fin').value || 0, 0);
+  const estourou = fin > cap; if (estourou) fin = cap;
+  const sinais = (st.sinais.length ? st.sinais : [{ valor: r2(venda * 0.02), data: hojeISO() }])
+    .map(e => ({ valor: Math.max(+e.valor || 0, 0), data: dataDe(e.data) }));
+  const anual = v => Math.pow(1 + (+v || 0) / 100, 1 / 12) - 1;
+  return {
+    u, venda, aval: u[4], renda, cap, fin, estourou,
+    fgts: Math.max(+$('fgts').value || 0, 0),
+    sinais, sinal: sinais.reduce((s, e) => s + e.valor, 0),
+    dBase: sinais[sinais.length - 1].data, // parcelas começam depois de quitado o sinal
+    meses: Math.min(Math.max(parseInt($('meses').value, 10) || 1, 1), MAX_PARC),
+    tipoB: st.tipoB, mesesBalao: st.mesesBalao, valorB: st.valorB, d0: sinais[0].data,
+    incc: anual($('incc').value), ipca: anual($('ipca').value),
+  };
 }
 
+// Um plano inteiro a partir de uma configuração. Até 24 parcelas o plano é fixo, sem INCC e sem IPCA + 1%.
+function simular(base, troca) {
+  const c = Object.assign({}, base, troca || {});
+  const meses = c.tipoB === 'x' ? c.mesesBalao : BALOES[c.tipoB].meses;
+  const bal = meses.filter(m => m >= 1 && m <= c.meses), nb = bal.length;
+  const excecao = c.tipoB === 'x' && nb > 0;
+  const saldo = c.venda - c.fin - c.sinal - c.fgts;
+  const sugB = Math.floor(Math.min(c.renda ? c.renda * LIM_BALAO : Infinity, Math.max(saldo, 0) * 0.4 / (nb || 1)) / 100) * 100;
+  const balao = nb ? (c.valorB === null ? sugB : c.valorB) : 0;
+  const parcela = (saldo - balao * nb) / c.meses;
+  const corrige = c.meses > FIXO_ATE;
+
+  const rows = c.sinais.map((e, k) => ({
+    n: k ? `S${k + 1}` : 0, data: e.data, tipo: c.sinais.length > 1 ? `Sinal ${k + 1}/${c.sinais.length}` : 'Sinal',
+    nom: e.valor, cor: e.valor, fase: 'Sem correção',
+  }));
+  let f = 1;
+  for (let m = 1; m <= c.meses; m++) {
+    const d = addMes(c.dBase, m), pos = d.getFullYear() * 12 + d.getMonth() > ENTREGA_IDX;
+    if (corrige) f *= pos ? (1 + c.ipca) * (1 + JUROS_POS) : 1 + c.incc;
+    const fase = corrige ? (pos ? 'IPCA + 1%' : 'INCC') : 'Fixa';
+    rows.push({ n: m, data: d, tipo: 'Parcela', nom: parcela, cor: parcela * f, fase, pos: corrige && pos });
+    if (bal.includes(m)) rows.push({ n: m, data: d, tipo: 'Balão', nom: balao, cor: balao * f, fase, pos: corrige && pos });
+  }
+  const totalCor = rows.reduce((s, r) => s + r.cor, 0);
+  rows.push({ n: '—', data: DATA_BANCO, tipo: 'Financiamento Caixa', nom: c.fin, cor: c.fin, fase: 'Banco' });
+  if (c.fgts > 0) rows.push({ n: '—', data: DATA_BANCO, tipo: 'FGTS', nom: c.fgts, cor: c.fgts, fase: 'Sem correção' });
+  rows.sort((a, b) => a.data - b.data);
+
+  const okParc = c.renda > 0 && parcela >= 0 && parcela <= c.renda * LIM_PARC + 0.005;
+  const okBalao = !nb || (c.renda > 0 && balao <= c.renda * LIM_BALAO + 0.005);
+  const saldoOk = saldo >= -0.005;
+  return { c, bal, nb, excecao, saldo, balao, sugB, parcela, corrige, rows, totalCor, okParc, okBalao, saldoOk, ok: okParc && okBalao && saldoOk, pSaldo: saldo / c.venda };
+}
+
+const barra = (v, lim) => { const w = lim ? v / lim : 1; return `<span class="bar ${w > 1 ? 'over' : ''}"><span style="width:${Math.min(Math.max(w, 0), 1) * 100}%"></span></span>`; };
+
 function calcular() {
-  const u = st.unit; if (!u) return;
+  if (!st.unit) return;
   st.export = null;
-  const venda = u[3], renda = Math.max(+$('renda').value || 0, 0);
-  const cap = r2(Math.min(u[4] * LTV, venda));
-  const alerts = [];
+  const c = config(), venda = c.venda, alerts = [];
 
-  let fin = Math.max(+$('fin').value || 0, 0);
-  if (fin > cap) { fin = cap; $('fin').value = cap; alerts.push(`Financiamento limitado a ${brl(cap)} (80% do valor de avaliação).`); }
-  $('finRange').max = cap; $('finRange').value = fin;
-  $('finCap').innerHTML = `Máximo ${brl(cap)} · ${pct(fin / venda)} do valor de venda · <button class="linkbtn" id="finPadrao" type="button">usar padrão de 80%</button>`;
-  if (!u[4]) alerts.push('Esta unidade está sem valor de avaliação na tabela. Confirme com a Caixa antes de simular financiamento.');
+  if (c.estourou) { $('fin').value = c.cap; alerts.push(`Financiamento limitado a ${brl(c.cap)} (80% do valor de avaliação).`); }
+  $('finRange').max = c.cap; $('finRange').value = c.fin;
+  $('finCap').innerHTML = `Máximo ${brl(c.cap)} · ${pct(c.fin / venda)} do valor de venda · <button class="linkbtn" id="finPadrao" type="button">usar padrão de 80%</button>`;
+  if (!c.aval) alerts.push('Esta unidade está sem valor de avaliação na tabela. Confirme com a Caixa antes de simular financiamento.');
+  if (!c.renda) alerts.push('Informe a renda do cliente para validar os limites de parcela e balão.');
 
-  const sinal = Math.max(+$('sinal').value || 0, 0);
-  const vezes = Math.min(Math.max(parseInt($('sinalVezes').value, 10) || 1, 1), 24);
-  $('sinalPct').textContent = `${pct(sinal / venda, 2)} do valor de venda · tabela: 2%`;
-  const fgts = Math.max(+$('fgts').value || 0, 0);
-  // Entrada = tudo que não é do banco. O que conta para os 20% é só o que fica parcelado,
-  // ou seja, a entrada depois de descontar sinal e FGTS.
-  const entrada = venda - fin, pEnt = entrada / venda, saldo = entrada - sinal - fgts, pSaldo = saldo / venda;
+  const res = simular(c);
+  if (!res.saldoOk) alerts.push('Sinal e FGTS somam mais que o valor a parcelar. Reduza um deles ou o financiamento.');
 
-  $('entPct').textContent = pct(Math.max(pSaldo, 0), 2);
-  $('entVal').textContent = brl(Math.max(saldo, 0));
-  $('gFill').style.width = Math.min(Math.max(pSaldo, 0) / 0.4, 1) * 100 + '%';
-  const acima = saldo > venda * ENT_MAX + 0.01; // tolerância de centavos
+  // editor
+  $('sinalPct').textContent = `Sinal de ${brl(c.sinal)} · ${pct(c.sinal / venda, 2)} do valor de venda (tabela: 2%)`
+    + (c.sinais.length > 1 ? ` em ${c.sinais.length} entradas` : '');
+  $('mesesHint').textContent = res.corrige ? 'Acima de 24: corrigidas por INCC / IPCA + 1%' : 'Até 24 parcelas: fixas, sem correção';
+  document.querySelectorAll('#balTipo button').forEach(b => b.setAttribute('aria-pressed', b.dataset.b === String(c.tipoB)));
+  $('balMesesWrap').hidden = c.tipoB !== 'x';
+  $('balWrap').hidden = !res.nb;
+  if (res.excecao) alerts.push(`Balões fora do padrão (meses ${res.bal.join(', ')}). O padrão é 2 anuais (12 e 24) ou 4 semestrais (6, 12, 18 e 24), e sair dele precisa de aprovação do gerente.`);
+  $('alerts').innerHTML = alerts.map(a => `<li>${a}</li>`).join('');
+  if (res.nb) {
+    if (document.activeElement !== $('valorBalao')) $('valorBalao').value = res.balao;
+    $('balHint').innerHTML = `Máximo ${c.renda ? brl(c.renda * LIM_BALAO) : '—'} (90% da renda) · <button class="linkbtn" id="balSug" type="button">usar sugestão ${brl(res.sugB)}</button>`;
+  }
+
+  // cards dos fluxos sugeridos + o fluxo editado
+  const puro = c.tipoB === 0 && !st.sinalCustom && SUGESTOES.some(s => s.meses === c.meses);
+  $('fluxos').innerHTML = SUGESTOES.map(s => {
+    const sinalPadrao = r2(venda * 0.02);
+    const r = simular(c, { meses: s.meses, tipoB: 0, valorB: null, sinal: sinalPadrao, sinais: [{ valor: sinalPadrao, data: c.d0 }] });
+    return `<button class="prop" data-m="${s.meses}" aria-pressed="${puro && c.meses === s.meses}">
+      <span class="chip ${r.ok ? 'ok' : 'bad'}">${r.ok ? '✓ Dentro das regras' : '✕ Fora das regras'}</span>
+      <span class="t">${s.nome}</span><span class="d">${s.desc}</span>
+      <span class="big">${s.meses}x ${brl(r.parcela)}</span>
+      <span class="d">Sinal de ${brl(r.c.sinal)} · ${pct(r.pSaldo, 1)} parcelado com a construtora</span>
+      <span class="meter"><span class="lbl"><span>Parcela / limite 30% da renda</span><span class="num">${c.renda ? pct(r.parcela / (c.renda * LIM_PARC), 0) : '—'}</span></span>${barra(r.parcela, c.renda * LIM_PARC)}</span>
+    </button>`;
+  }).join('') + (puro ? '' : `<div class="prop" style="border-color:var(--espresso);cursor:default">
+      <span class="chip ${res.ok ? 'ok' : 'bad'}">${res.ok ? '✓ Dentro das regras' : '✕ Fora das regras'}</span>
+      <span class="t">Fluxo editado</span><span class="d">${res.nb ? `${res.nb} balões${res.excecao ? ' fora do padrão' : ''}` : 'Sem balões'}${c.sinais.length > 1 ? ` · sinal em ${c.sinais.length} entradas` : ''}${res.corrige ? '' : ' · parcelas fixas'}</span>
+      ${res.excecao ? '<span class="chip warn">Fora do padrão · aprovação do gerente</span>' : ''}
+      <span class="big">${c.meses}x ${brl(res.parcela)}</span>
+      <span class="d">Sinal de ${brl(c.sinal)} · ${pct(res.pSaldo, 1)} parcelado com a construtora</span>
+      ${res.nb ? `<span class="d">${res.nb} balões de ${brl(res.balao)}</span>` : ''}
+    </div>`);
+
+  resumo(res, c);
+}
+
+// ---------- 4 · Resumo ----------
+function resumo(res, c) {
+  const venda = c.venda;
+  $('fluxoTitulo').textContent = `Resumo · ${c.meses}x${res.nb ? ` + ${res.nb} balões` : ''}`;
+
+  // medidor: o que fica parcelado com a construtora precisa caber nos 20%
+  $('entPct').textContent = pct(Math.max(res.pSaldo, 0), 2);
+  $('entVal').textContent = brl(Math.max(res.saldo, 0));
+  $('gFill').style.width = Math.min(Math.max(res.pSaldo, 0) / 0.4, 1) * 100 + '%';
+  const acima = res.saldo > venda * ENT_MAX + 0.01;
   $('gFill').classList.toggle('over', acima);
   $('entChip').innerHTML = acima ? '<span class="chip warn">Acima de 20% · precisa de aprovação do gerente</span>'
     : '<span class="chip ok">Até 20% · dentro do permitido</span>';
-  $('entResumo').innerHTML = `<span>Entrada total (fora o banco): <b class="num">${brl(entrada)}</b> · ${pct(pEnt, 2)}</span>`
-    + `<span>Sinal ${pct(sinal / venda, 2)}${vezes > 1 ? ` em ${vezes}x` : ''} · FGTS ${pct(fgts / venda, 2)}</span>`;
+  $('entResumo').innerHTML = `<span>Entrada total (fora o banco): <b class="num">${brl(venda - c.fin)}</b> · ${pct((venda - c.fin) / venda, 2)}</span>`
+    + `<span>Sinal ${pct(c.sinal / venda, 2)}${c.sinais.length > 1 ? ` em ${c.sinais.length} entradas` : ''} · FGTS ${pct(c.fgts / venda, 2)}</span>`;
 
-  // Sinal que zera o excedente: entrada − FGTS − 20% do valor de venda
-  const sinalIdeal = r2(Math.max(entrada - fgts - venda * ENT_MAX, 0));
+  const sinalIdeal = r2(Math.max(venda - c.fin - c.fgts - venda * ENT_MAX, 0));
   const sug = $('sugestao');
-  sug.hidden = sinalIdeal <= sinal + 0.01;
+  sug.hidden = sinalIdeal <= c.sinal + 0.01;
   if (!sug.hidden) {
-    const parcelaIdeal = venda * ENT_MAX / MESES;
+    const parcelaIdeal = venda * ENT_MAX / c.meses;
     sug.dataset.sinal = sinalIdeal;
-    sug.innerHTML = `<b>Financiamento em ${pct(fin / venda)} do valor de venda</b>, abaixo do padrão de 80%. Sobra mais para parcelar com a construtora.<br>
-      Com sinal de <b class="num">${brl(sinalIdeal)}</b> (${pct(sinalIdeal / venda)}), o parcelamento fica nos 20%: 60x de <b class="num">${brl(parcelaIdeal)}</b> sem balões.
-      ${renda && parcelaIdeal > renda * LIM_PARC ? '<br>Essa parcela ainda passa de 30% da renda: use balões na etapa 3.' : ''}
+    sug.innerHTML = `<b>Financiamento em ${pct(c.fin / venda)} do valor de venda</b>, abaixo do padrão de 80%. Sobra mais para parcelar com a construtora.<br>
+      Com sinal de <b class="num">${brl(sinalIdeal)}</b> (${pct(sinalIdeal / venda)}), o parcelamento fica nos 20%: ${c.meses}x de <b class="num">${brl(parcelaIdeal)}</b> sem balões.
+      ${c.renda && parcelaIdeal > c.renda * LIM_PARC ? '<br>Essa parcela ainda passa de 30% da renda: use balões na edição do fluxo.' : ''}
       <button class="btn btn-alt" id="aplicarSinal" type="button">Usar esse sinal</button>`;
   }
-  if (!renda) alerts.push('Informe a renda do cliente para validar os limites de parcela e balão.');
-  if (saldo < 0) alerts.push('Sinal e FGTS somam mais que a entrada. Reduza um deles ou o valor financiado.');
-  $('alerts').innerHTML = alerts.map(a => `<li>${a}</li>`).join('');
 
-  if (saldo < 0) { $('props').innerHTML = ''; return; }
+  // descrição em texto
+  const cv = condicaoVenda(res, c);
+  const li = [];
+  li.push(`<li>Torre ${c.u[0]}, unidade <b>${c.u[1]}</b>, ${m2(c.u[2])}. Valor de venda <b class="num">${brl(venda)}</b>.</li>`);
+  li.push(`<li>Sinal de <b class="num">${brl(c.sinal)}</b> (${pct(c.sinal / venda, 2)})${c.sinais.length > 1
+    ? ` em ${c.sinais.length} entradas: ${c.sinais.map(e => `${brl(e.valor)} em ${dataBR(e.data)}`).join(', ')}`
+    : `, à vista em ${dataBR(c.d0)}`}.</li>`);
+  if (c.fgts) li.push(`<li>FGTS de <b class="num">${brl(c.fgts)}</b>, liberado na assinatura com a Caixa.</li>`);
+  li.push(`<li><b>${c.meses} parcelas de ${brl(res.parcela)}</b>, a partir de ${dataBR(addMes(c.dBase, 1))}, ${res.corrige ? 'corrigidas pelo INCC até a entrega e pelo IPCA + 1% a.m. depois' : 'fixas, sem correção'}.</li>`);
+  if (res.nb) li.push(`<li>${res.nb} balões de <b class="num">${brl(res.balao)}</b> nos meses ${res.bal.join(', ')}${res.corrige ? ', com a mesma correção das parcelas' : ', fixos'}.${res.excecao ? ' <b>Fora do padrão: precisa de aprovação do gerente.</b>' : ''}</li>`);
+  li.push(`<li>Financiamento de <b class="num">${brl(c.fin)}</b> pela Caixa (${pct(c.fin / venda)} da venda), na entrega, em ${dataBR(DATA_BANCO)}.</li>`);
+  if (cv.bomPagador) li.push(`<li>Bom pagador de <b class="num">${brl(cv.bomPagador)}</b>: na proposta o valor do imóvel passa a ser a avaliação, ${brl(c.aval)}.</li>`);
+  li.push(`<li>Pago à construtora até a entrega das chaves, com a correção projetada: <b class="num">${brl(res.totalCor)}</b>.</li>`);
+  $('descricao').innerHTML = li.join('');
 
-  // Balões: sugestão = menor entre 90% da renda e 40% do saldo dividido pelos balões
-  const nb = PROPOSTAS[st.tipoB].baloes.length;
-  const sugestao = Math.floor(Math.min(renda ? renda * LIM_BALAO : Infinity, saldo * 0.4 / nb) / 100) * 100;
-  const valorB = st.valorB === null ? sugestao : st.valorB;
-  if (document.activeElement !== $('valorBalao')) $('valorBalao').value = valorB;
-  $('balHint').innerHTML = `Máximo ${renda ? brl(renda * LIM_BALAO) : '—'} (90% da renda) · <button class="linkbtn" id="balSug" type="button">usar sugestão ${brl(sugestao)}</button>`;
-  if (!st.baloes) st.prop = 0;
-
-  const [y, mo, d] = ($('dataSinal').value || new Date().toISOString().slice(0, 10)).split('-').map(Number);
-  const d0 = new Date(y, mo - 1, d);
-  const anual = v => Math.pow(1 + (+v || 0) / 100, 1 / 12) - 1;
-  const incc = anual($('incc').value), ipca = anual($('ipca').value);
-
-  const res = (st.baloes ? [0, st.tipoB] : [0]).map(i => {
-    const p = PROPOSTAS[i];
-    const r = montarFluxo(p, saldo, sinal, vezes, fin, fgts, d0, valorB, incc, ipca);
-    r.okParc = renda > 0 && r.parcela >= 0 && r.parcela <= renda * LIM_PARC + 0.005;
-    r.okBalao = !p.baloes.length || (renda > 0 && r.balao <= renda * LIM_BALAO + 0.005);
-    return { ...p, ...r, i };
-  });
-
-  const barra = (v, lim) => { const w = lim ? v / lim : 1; return `<span class="bar ${w > 1 ? 'over' : ''}"><span style="width:${Math.min(w, 1) * 100}%"></span></span>`; };
-  $('props').innerHTML = res.map(p => {
-    const ok = p.okParc && p.okBalao;
-    return `<button class="prop" data-p="${p.i}" aria-pressed="${p.i === st.prop}">
-      <span class="chip ${ok ? 'ok' : 'bad'}">${ok ? '✓ Dentro das regras' : '✕ Fora das regras'}</span>
-      <span class="t">${p.nome}</span><span class="d">${p.desc}</span>
-      <span class="big">60x ${brl(p.parcela)}</span>
-      ${p.parcela < 0 ? '<span class="chip bad">Balões somam mais que o saldo da entrada</span>' : ''}
-      ${p.baloes.length ? `<span class="d">+ ${p.baloes.length} balões de <b class="num">${brl(p.balao)}</b></span>` : '<span class="d">Sem balões</span>'}
-      <span class="meter"><span class="lbl"><span>Parcela / limite 30% da renda</span><span class="num">${renda ? pct(p.parcela / (renda * LIM_PARC), 0) : '—'}</span></span>${barra(p.parcela, renda * LIM_PARC)}</span>
-      ${p.baloes.length ? `<span class="meter"><span class="lbl"><span>Cada balão / limite 90% da renda</span><span class="num">${renda ? pct(p.balao / (renda * LIM_BALAO), 0) : '—'}</span></span>${barra(p.balao, renda * LIM_BALAO)}</span>` : ''}
-      <span class="foot">Pago à construtora com correção projetada: <b class="num">${brl(p.totalCor)}</b></span>
-    </button>`;
-  }).join('');
-
-  const p = res.find(r => r.i === st.prop) || res[0];
-  desenharFluxo(p, { venda, aval: u[4], sinal, vezes, fin, fgts, d0, renda });
-}
-
-// ---------- 4 · Fluxo ----------
-// Bom pagador = avaliação − venda. Só vale quando o financiamento passa de 80% da venda
-// (e fica até 80% da avaliação, garantido pelo teto). Aí o valor do imóvel passa a ser a avaliação.
-function condicaoVenda(p, { venda, aval, sinal, vezes, fin, fgts, d0 }) {
-  const bomPagador = fin > venda * LTV + 0.01 ? aval - venda : 0;
-  const nb = p.baloes.length;
-  const linhas = [
-    { i: 0, tipo: 'Sinal', qte: vezes, venc: d0, valor: r2(sinal / vezes), obs: vezes > 1 ? 'Mensais, sem correção' : 'Sem correção' },
-    { i: 2, tipo: 'Parcelas', qte: MESES, venc: addMes(d0, 1), valor: r2(p.parcela), obs: 'INCC até entrega, IPCA+1% após' },
-    bomPagador > 0 && { i: 3, tipo: 'Bom pagador', qte: 1, venc: null, valor: r2(bomPagador), obs: 'Avaliação − venda' },
-    nb && { i: 4, tipo: 'Balões', qte: nb, venc: addMes(d0, p.baloes[0]), valor: r2(p.balao), obs: nb === 2 ? 'Anuais' : 'Semestrais' },
-    fgts > 0 && { i: 5, tipo: 'FGTS', qte: 1, venc: DATA_BANCO, valor: fgts, obs: 'Liberado na assinatura' },
-    { i: 6, tipo: 'Banco', qte: 1, venc: DATA_BANCO, valor: fin, obs: 'Caixa' },
-  ].filter(Boolean);
-  return { valorImovel: bomPagador > 0 ? aval : venda, bomPagador, linhas };
-}
-
-const isoData = d => d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` : '';
-const moeda = v => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-function desenharFluxo(p, { venda, aval, sinal, vezes, fin, fgts, d0, renda }) {
-  $('fluxoTitulo').textContent = `Fluxo · ${p.nome}`;
-  const cv = condicaoVenda(p, { venda, aval, sinal, vezes, fin, fgts, d0 });
+  // condição de venda
   const cls = { 'Balões': 'balao', 'Banco': 'banco', 'FGTS': 'banco', 'Bom pagador': 'bompag' };
   $('condicao').innerHTML = `<tr><th>Tipo</th><th>Qtd</th><th>1º vencimento</th><th>Valor parcela</th><th>Total</th><th class="obs">Observações</th></tr>` +
-    cv.linhas.map(l => `<tr class="${cls[l.tipo] || ''}"><td>${l.tipo}</td><td>${l.qte}</td><td>${l.venc ? dataBR(l.venc) : '—'}</td><td class="num">${brl(l.valor)}</td><td class="num">${brl(l.valor * l.qte)}</td><td class="obs">${l.obs}</td></tr>`).join('') +
+    cv.linhas.map(l => `<tr class="${cls[l.tipo] || ''}"><td>${l.tipo}</td><td>${l.qte}</td><td>${l.venc ? dataBR(l.venc) : '—'}</td><td class="num">${l.valor === null ? '—' : brl(l.valor)}</td><td class="num">${brl(total(l))}</td><td class="obs">${l.obs}</td></tr>`).join('') +
     `<tr class="total"><td>Total</td><td></td><td></td><td></td><td class="num">${brl(cv.valorImovel)}</td><td class="obs">${cv.bomPagador ? 'Valor de avaliação (com bom pagador)' : 'Valor de venda'}</td></tr>`;
   st.export = {
-    apto: String(st.unit[1]), torre: String(st.unit[0]), valor_imovel: moeda(cv.valorImovel),
-    linhas: cv.linhas.map(l => ({ i: l.i, qte: String(l.qte), venc: isoData(l.venc), valor: moeda(l.valor), total: moeda(l.valor * l.qte), obs: l.obs })),
+    apto: String(c.u[1]), torre: String(c.u[0]), valor_imovel: moeda(cv.valorImovel),
+    obs1: limpar(cv.obs[0] || ''), obs2: limpar(cv.obs[1] || ''),
+    linhas: cv.linhas.map(l => ({ i: l.i, qte: String(l.qte), venc: isoData(l.venc), valor: l.valor === null ? '' : moeda(l.valor), total: moeda(total(l)), obs: limpar(l.obs) })),
   };
 
-  // Gráfico: um slot por mês de parcela (sinal fica só na tabela)
-  const W = 720, H = 190, top = 14, bw = W / MESES;
-  const slots = Array.from({ length: MESES }, () => ({ parc: 0, bal: 0 }));
-  for (const r of p.rows) {
+  grafico(res, c);
+
+  $('extrato').innerHTML = `<tr><th>Nº</th><th>Vencimento</th><th>Tipo</th><th>Índice</th><th>Valor de tabela</th><th>Projeção corrigida</th></tr>` +
+    res.rows.map(r => `<tr class="${r.tipo === 'Balão' ? 'balao' : r.n === '—' ? 'banco' : ''}"><td>${r.n}</td><td class="l">${dataBR(r.data)}</td><td class="l">${r.tipo}</td><td class="l">${r.fase}</td><td class="num">${brl(r.nom)}</td><td class="num">${brl(r.cor)}</td></tr>`).join('');
+}
+
+// Bom pagador = avaliação − venda. Só vale quando o financiamento passa de 80% da venda
+// (e fica até 80% da avaliação, garantido pelo teto). Aí o valor do imóvel passa a ser a avaliação.
+const total = l => l.total === undefined ? l.valor * l.qte : l.total;
+
+// as observações da proposta são duas linhas curtas; quebra o texto entre elas
+function quebrar(txt, limite = 95) {
+  if (txt.length <= limite) return [txt];
+  let corte = txt.lastIndexOf('; ', limite);
+  if (corte < 0) corte = limite;
+  return [txt.slice(0, corte + 1).trim(), txt.slice(corte + 1).trim()];
+}
+
+function condicaoVenda(res, c) {
+  const bomPagador = c.fin > c.venda * LTV + 0.01 ? c.aval - c.venda : 0;
+  // entradas de sinal com valores diferentes não cabem numa linha só: vão para as observações
+  const iguais = c.sinais.every(e => Math.abs(e.valor - c.sinais[0].valor) < 0.005);
+  const detalhe = c.sinais.map(e => `${brl(e.valor)} em ${dataBR(e.data)}`);
+  const linhas = [
+    { i: 0, tipo: 'Sinal', qte: c.sinais.length, venc: c.d0, valor: iguais ? r2(c.sinal / c.sinais.length) : null, total: r2(c.sinal),
+      obs: c.sinais.length === 1 ? 'Sem correção' : (iguais ? 'Mensais, sem correção' : 'Valores diferentes · ver observações') },
+    { i: 2, tipo: 'Parcelas', qte: c.meses, venc: addMes(c.dBase, 1), valor: r2(res.parcela), obs: res.corrige ? 'INCC até entrega, IPCA+1% após' : 'Fixas, sem correção' },
+    bomPagador > 0 && { i: 3, tipo: 'Bom pagador', qte: 1, venc: null, valor: r2(bomPagador), obs: 'Avaliação − venda' },
+    res.nb && { i: 4, tipo: 'Balões', qte: res.nb, venc: addMes(c.dBase, res.bal[0]), valor: r2(res.balao),
+      obs: res.excecao ? `Meses ${res.bal.join(', ')}` : (res.nb === 2 ? 'Anuais' : 'Semestrais') },
+    c.fgts > 0 && { i: 5, tipo: 'FGTS', qte: 1, venc: DATA_BANCO, valor: c.fgts, obs: 'Liberado na assinatura' },
+    { i: 6, tipo: 'Banco', qte: 1, venc: DATA_BANCO, valor: c.fin, obs: 'Caixa' },
+  ].filter(Boolean);
+  // observações do rodapé da proposta: detalhe do sinal e dos balões, uma linha para cada
+  const textos = [];
+  if (!iguais) textos.push(`Sinal em ${c.sinais.length} entradas: ${detalhe.join('; ')}.`);
+  if (res.nb) textos.push(`${res.nb} balões de ${brl(res.balao)} em ${res.bal.map(m => dataBR(addMes(c.dBase, m))).join(', ')}.`);
+  const obs = textos.length === 1 ? quebrar(textos[0]) : textos;
+  return { valorImovel: bomPagador > 0 ? c.aval : c.venda, bomPagador, linhas, obs };
+}
+
+function grafico(res, c) {
+  const W = 720, H = 190, top = 14, bw = W / c.meses;
+  const slots = Array.from({ length: c.meses }, () => ({ parc: 0, bal: 0 }));
+  for (const r of res.rows) {
     if (!(r.n > 0)) continue;
     const s = slots[r.n - 1];
     if (r.tipo === 'Balão') s.bal = r.cor; else { s.parc = Math.max(r.cor, 0); s.pos = r.pos; s.data = r.data; }
   }
-  const lim = renda * LIM_PARC;
-  const max = Math.max(...slots.map(s => s.parc + s.bal), lim) * 1.05;
+  const lim = c.renda * LIM_PARC;
+  const max = Math.max(...slots.map(s => s.parc + s.bal), lim) * 1.05 || 1;
   const y = v => H - (v / max) * (H - top);
   let svg = '';
   slots.forEach((s, i) => {
-    const x = i * bw + 1, w = bw - 2;
+    const x = i * bw + 1, w = Math.max(bw - 2, 1);
     const cor = s.pos ? 'var(--ink)' : 'var(--bronze)';
     svg += `<rect class="b" x="${x}" y="${y(s.parc)}" width="${w}" height="${H - y(s.parc)}" fill="${cor}"><title>Parcela ${i + 1} · ${dataBR(s.data)} · ${brl(s.parc)}</title></rect>`;
     if (s.bal) svg += `<rect class="b" x="${x}" y="${y(s.parc + s.bal)}" width="${w}" height="${y(s.parc) - y(s.parc + s.bal)}" fill="var(--alert)"><title>Balão · ${dataBR(s.data)} · ${brl(s.bal)}</title></rect>`;
     if (s.data && s.data.getMonth() === 0) svg += `<text x="${x}" y="${H + 16}" font-size="10" font-family="IBM Plex Mono,monospace" fill="#5E6863">${s.data.getFullYear()}</text>`;
   });
   const iEnt = slots.findIndex(s => s.pos);
-  if (iEnt >= 0) svg += `<line x1="${iEnt * bw}" x2="${iEnt * bw}" y1="0" y2="${H}" stroke="#1D2320" stroke-dasharray="3 3"/><text x="${iEnt * bw - 4}" y="10" text-anchor="end" font-size="10" font-family="IBM Plex Mono,monospace" fill="#1D2320">Entrega ago/2029 · Caixa ${brl(fin)}</text>`;
+  if (iEnt >= 0) svg += `<line x1="${iEnt * bw}" x2="${iEnt * bw}" y1="0" y2="${H}" stroke="#1D2320" stroke-dasharray="3 3"/><text x="${iEnt * bw - 4}" y="10" text-anchor="end" font-size="10" font-family="IBM Plex Mono,monospace" fill="#1D2320">Entrega ago/2029 · Caixa ${brl(c.fin)}</text>`;
   if (lim) svg += `<line x1="0" x2="${W}" y1="${y(lim)}" y2="${y(lim)}" stroke="var(--amber)" stroke-width="1.5"/>`;
-  $('chart').innerHTML = `<svg viewBox="0 0 ${W} ${H + 22}" role="img" aria-label="Pagamentos mensais projetados com correção">${svg}</svg>`;
-
-  $('extrato').innerHTML = `<tr><th>Nº</th><th>Vencimento</th><th>Tipo</th><th>Índice</th><th>Valor de tabela</th><th>Projeção corrigida</th></tr>` +
-    p.rows.map(r => `<tr class="${r.tipo === 'Balão' ? 'balao' : r.n === '—' ? 'banco' : ''}"><td>${r.n}</td><td class="l">${dataBR(r.data)}</td><td class="l">${r.tipo}</td><td class="l">${r.fase}</td><td class="num">${brl(r.nom)}</td><td class="num">${brl(r.cor)}</td></tr>`).join('');
+  $('chart').innerHTML = `<svg viewBox="0 0 ${W} ${H + 22}" role="img" aria-label="Pagamentos mensais projetados">${svg}</svg>`;
 }
 
+// ---------- 5 · Comparar unidades ----------
+function renderCmp() {
+  const L = st.comparar;
+  $('cmpVazio').hidden = L.length > 0;
+  $('cmp').innerHTML = !L.length ? '' :
+    `<tr><th>Unidade</th><th>Venda</th><th>Financiado</th><th>Sinal</th><th>Parcelas</th><th>Balões</th><th>Parcelado</th><th>Situação</th><th></th></tr>` +
+    L.map((s, i) => `<tr>
+      <td class="l">T${s.t} · ${s.u}<br><span class="under">${m2(s.area)}</span></td>
+      <td class="num">${brl(s.venda)}</td>
+      <td class="num">${brl(s.fin)}<br><span class="under">${pct(s.fin / s.venda)}</span></td>
+      <td class="num">${brl(s.sinal)}${s.vezes > 1 ? `<br><span class="under">${s.vezes} entradas</span>` : ''}${s.fgts ? `<br><span class="under">FGTS ${brl(s.fgts)}</span>` : ''}</td>
+      <td class="num">${s.meses}x ${brl(s.parcela)}<br><span class="under">${s.corrige ? 'corrigidas' : 'fixas'}</span></td>
+      <td class="num">${s.nb ? `${s.nb}x ${brl(s.balao)}${s.excecao ? '<br><span class="under">fora do padrão</span>' : ''}` : '—'}</td>
+      <td class="num">${pct(s.pSaldo, 1)}</td>
+      <td><span class="chip ${s.ok ? 'ok' : 'bad'}">${s.ok ? 'Dentro' : 'Fora'}</span></td>
+      <td><button class="iconbtn no-print" data-i="${i}" aria-label="Remover simulação">✕</button></td>
+    </tr>`).join('');
+}
+
+$('cmpAdd').addEventListener('click', () => {
+  if (!st.unit) return;
+  const c = config(), r = simular(c);
+  st.comparar.push({ t: c.u[0], u: c.u[1], area: c.u[2], venda: c.venda, fin: c.fin, sinal: c.sinal, vezes: c.sinais.length, fgts: c.fgts, meses: c.meses, nb: r.nb, balao: r.balao, parcela: r.parcela, pSaldo: r.pSaldo, ok: r.ok, corrige: r.corrige, excecao: r.excecao });
+  renderCmp();
+  $('s5').scrollIntoView({ block: 'nearest' });
+});
+$('cmp').addEventListener('click', e => { const b = e.target.closest('.iconbtn'); if (b) { st.comparar.splice(+b.dataset.i, 1); renderCmp(); } });
+
 // ---------- Eventos ----------
-$('props').addEventListener('click', e => { const b = e.target.closest('.prop'); if (b) { st.prop = +b.dataset.p; calcular(); } });
-$('balToggle').addEventListener('click', e => {
-  st.baloes = !st.baloes;
-  st.prop = st.baloes ? st.tipoB : 0;
-  e.target.setAttribute('aria-expanded', st.baloes);
-  e.target.textContent = st.baloes ? '− Remover balões' : '+ Adicionar balões';
-  $('balPanel').hidden = !st.baloes;
+function renderSinais() {
+  $('sinais').innerHTML = st.sinais.map((e, k) => `
+    <div class="sinal-row" data-k="${k}">
+      <label class="f"><span class="idx">Valor (R$)</span><input class="sv" type="number" min="0" step="100" value="${e.valor}" aria-label="Valor da entrada ${k + 1} do sinal"></label>
+      <label class="f"><span class="idx">Vencimento</span><input class="sd" type="date" value="${e.data}" aria-label="Data da entrada ${k + 1} do sinal"></label>
+      <button class="iconbtn" type="button" data-rm="${k}" aria-label="Remover entrada ${k + 1}" ${st.sinais.length === 1 ? 'disabled' : ''}>✕</button>
+    </div>`).join('');
+}
+
+$('sinais').addEventListener('input', e => {
+  const row = e.target.closest('.sinal-row'); if (!row) return;
+  const k = +row.dataset.k;
+  if (e.target.classList.contains('sv')) st.sinais[k].valor = Math.max(+e.target.value || 0, 0);
+  else st.sinais[k].data = e.target.value;
+  st.sinalCustom = true; calcular();
+});
+$('sinais').addEventListener('click', e => {
+  const b = e.target.closest('[data-rm]'); if (!b || st.sinais.length === 1) return;
+  st.sinais.splice(+b.dataset.rm, 1); st.sinalCustom = true; renderSinais(); calcular();
+});
+$('addSinal').addEventListener('click', () => {
+  const ultima = st.sinais[st.sinais.length - 1];
+  st.sinais.push({ valor: 0, data: isoData(addMes(dataDe(ultima.data), 1)) });
+  st.sinalCustom = true; renderSinais(); calcular();
+});
+$('balMeses').addEventListener('input', e => {
+  st.mesesBalao = e.target.value.split(/[^0-9]+/).filter(Boolean).map(Number).sort((a, b) => a - b);
   calcular();
+});
+
+$('fluxos').addEventListener('click', e => {
+  const b = e.target.closest('.prop[data-m]'); if (!b) return;
+  $('meses').value = b.dataset.m;
+  st.tipoB = 0; st.valorB = null; st.sinalCustom = false;
+  st.sinais = [{ valor: r2(st.unit[3] * 0.02), data: st.sinais[0].data }];
+  renderSinais(); calcular();
 });
 $('balTipo').addEventListener('click', e => {
-  const b = e.target.dataset.b; if (!b) return;
-  st.tipoB = st.prop = +b; st.valorB = null;
-  document.querySelectorAll('#balTipo button').forEach(x => x.setAttribute('aria-pressed', x === e.target));
-  calcular();
+  const b = e.target.dataset.b; if (b === undefined) return;
+  st.tipoB = b === 'x' ? 'x' : +b; st.valorB = null; calcular();
 });
 $('valorBalao').addEventListener('input', e => { st.valorB = e.target.value === '' ? null : Math.max(+e.target.value, 0); calcular(); });
-$('balHint').addEventListener('click', e => { if (e.target.id === 'balSug') { e.preventDefault(); st.valorB = null; $('valorBalao').blur(); calcular(); } });
+$('balHint').addEventListener('click', e => { if (e.target.id === 'balSug') { st.valorB = null; $('valorBalao').blur(); calcular(); } });
+$('sugestao').addEventListener('click', e => {
+  if (e.target.id !== 'aplicarSinal') return;
+  st.sinais = [{ valor: +$('sugestao').dataset.sinal, data: st.sinais[0].data }];
+  st.sinalCustom = true; renderSinais(); calcular();
+});
+$('finCap').addEventListener('click', e => { if (e.target.id === 'finPadrao') { $('fin').value = r2(Math.min(st.unit[4] * LTV, st.unit[3] * LTV)); calcular(); } });
+$('finRange').addEventListener('input', e => { $('fin').value = e.target.value; calcular(); });
 $('exportar').addEventListener('click', () => {
-  if (!st.export) return alert('Ajuste o fluxo antes de exportar: o sinal está maior que a entrada.');
+  if (!st.export) return alert('Ajuste o fluxo antes de exportar: o sinal e o FGTS somam mais que o valor a parcelar.');
   const url = 'Proposta%20Prime%202.html#fluxo=' + encodeURIComponent(JSON.stringify(st.export));
   if (!window.open(url, '_blank')) location.href = url;
 });
-$('finRange').addEventListener('input', e => { $('fin').value = e.target.value; calcular(); });
-$('sugestao').addEventListener('click', e => { if (e.target.id === 'aplicarSinal') { $('sinal').value = $('sugestao').dataset.sinal; calcular(); } });
-$('finCap').addEventListener('click', e => {
-  if (e.target.id !== 'finPadrao') return;
-  const u = st.unit;
-  $('fin').value = r2(Math.min(u[4] * LTV, u[3] * LTV));
-  calcular();
-});
-['renda', 'sinal', 'sinalVezes', 'fgts', 'fin', 'dataSinal', 'incc', 'ipca'].forEach(id => $(id).addEventListener('input', calcular));
+['renda', 'fin', 'fgts', 'meses', 'incc', 'ipca'].forEach(id => $(id).addEventListener('input', calcular));
 
-$('dataSinal').value = new Date().toISOString().slice(0, 10);
 selecionar(U.find(u => u[0] === 1 && u[1] === 101));
 // no celular a implantação rola na horizontal: centraliza a coluna selecionada
 $('implant').scrollLeft = document.querySelector('.pin[aria-pressed="true"]').offsetLeft - $('implant').clientWidth / 2;
