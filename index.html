@@ -373,6 +373,9 @@ const $ = id => document.getElementById(id);
 const brl = v => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const pct = (v, d = 1) => (v * 100).toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d }) + '%';
 const m2 = v => v.toLocaleString('pt-BR') + ' m²';
+// planta pela área privativa: 51,66 m² = 2 quartos · 59,93 m² = 3 quartos
+const quartos = a => Math.abs(a - 51.66) < 0.01 ? '2 quartos' : Math.abs(a - 59.93) < 0.01 ? '3 quartos' : null;
+const planta = a => (quartos(a) ? quartos(a) + ' · ' : '') + m2(a);
 const dataBR = d => d.toLocaleDateString('pt-BR');
 const addMes = (d, n) => { const y = d.getFullYear(), m = d.getMonth() + n; return new Date(y, m, Math.min(d.getDate(), new Date(y, m + 1, 0).getDate())); };
 const r2 = v => Math.round(v * 100) / 100;
@@ -424,7 +427,7 @@ function desenharColuna() {
   const us = U.filter(u => u[0] === t && colunaDe(u) === c).sort((a, b) => andarDe(b) - andarDe(a));
   const disp = us.filter(u => !u[5]).length;
   $('colTitulo').textContent = `Torre ${t} · Coluna ${c}`;
-  $('colInfo').textContent = `${m2(us[0][2])} · ${disp} de ${us.length} disponíveis · escolha o andar`;
+  $('colInfo').textContent = `${planta(us[0][2])} · ${disp} de ${us.length} disponíveis · escolha o andar`;
   $('andares').innerHTML = us.map(u => `
     <button class="andar" data-i="${U.indexOf(u)}" aria-pressed="${u === st.unit}" ${u[5] ? 'disabled' : ''}>
       <b>${andarDe(u) ? andarDe(u) + 'º andar' : 'Térreo'}</b>
@@ -441,7 +444,7 @@ function selecionar(u) {
   $('fin').value = r2(Math.min(u[4] * LTV, u[3] * LTV));
   desenharColuna();
   $('unit').innerHTML = `
-    <div class="eyebrow">Torre ${u[0]} · Unidade ${u[1]} · ${m2(u[2])}</div>
+    <div class="eyebrow">Torre ${u[0]} · Unidade ${u[1]} · ${planta(u[2])}</div>
     <p class="price num">${brl(u[3])}</p>
     <div class="under">Valor de venda — base da proposta</div>
     <dl>
@@ -519,7 +522,8 @@ function simular(base, troca) {
   const okParc = c.renda > 0 && parcela >= 0 && parcela <= c.renda * LIM_PARC + 0.005;
   const okBalao = !nb || (c.renda > 0 && balao <= c.renda * LIM_BALAO + 0.005);
   const saldoOk = saldo >= -0.005;
-  return { c, bal, nb, excecao, saldo, balao, sugB, parcela, corrige, rows, totalCor, okParc, okBalao, saldoOk, ok: okParc && okBalao && saldoOk, pSaldo: saldo / c.venda };
+  const ok20 = saldo <= c.venda * ENT_MAX + 0.01;   // parcelamento com a construtora até 20% da venda
+  return { c, bal, nb, excecao, saldo, balao, sugB, parcela, corrige, rows, totalCor, okParc, okBalao, saldoOk, ok20, ok: okParc && okBalao && saldoOk && ok20, pSaldo: saldo / c.venda };
 }
 
 const barra = (v, lim) => { const w = lim ? v / lim : 1; return `<span class="bar ${w > 1 ? 'over' : ''}"><span style="width:${Math.min(Math.max(w, 0), 1) * 100}%"></span></span>`; };
@@ -537,6 +541,7 @@ function calcular() {
 
   const res = simular(c);
   if (!res.saldoOk) alerts.push('Sinal e FGTS somam mais que o valor a parcelar. Reduza um deles ou o financiamento.');
+  if (!res.ok20) alerts.push(`Parcelamento com a construtora em ${pct(res.pSaldo, 2)} do valor de venda, acima do limite de 20%. Aumente o sinal ou o FGTS, ou peça aprovação do gerente.`);
 
   // editor
   $('sinalPct').textContent = `Sinal de ${brl(c.sinal)} · ${pct(c.sinal / venda, 2)} do valor de venda (tabela: 2%)`
@@ -563,6 +568,7 @@ function calcular() {
       <span class="big">${s.meses}x ${brl(r.parcela)}</span>
       <span class="d">Sinal de ${brl(r.c.sinal)} · ${pct(r.pSaldo, 1)} parcelado com a construtora</span>
       <span class="meter"><span class="lbl"><span>Parcela / limite 30% da renda</span><span class="num">${c.renda ? pct(r.parcela / (c.renda * LIM_PARC), 0) : '—'}</span></span>${barra(r.parcela, c.renda * LIM_PARC)}</span>
+      <span class="meter"><span class="lbl"><span>Parcelado / limite 20% da venda</span><span class="num">${pct(r.pSaldo / ENT_MAX, 0)}</span></span>${barra(r.saldo, venda * ENT_MAX)}</span>
     </button>`;
   }).join('') + (puro ? '' : `<div class="prop" style="border-color:var(--espresso);cursor:default">
       <span class="chip ${res.ok ? 'ok' : 'bad'}">${res.ok ? '✓ Dentro das regras' : '✕ Fora das regras'}</span>
@@ -571,6 +577,8 @@ function calcular() {
       <span class="big">${c.meses}x ${brl(res.parcela)}</span>
       <span class="d">Sinal de ${brl(c.sinal)} · ${pct(res.pSaldo, 1)} parcelado com a construtora</span>
       ${res.nb ? `<span class="d">${res.nb} balões de ${brl(res.balao)}</span>` : ''}
+      <span class="meter"><span class="lbl"><span>Parcela / limite 30% da renda</span><span class="num">${c.renda ? pct(res.parcela / (c.renda * LIM_PARC), 0) : '—'}</span></span>${barra(res.parcela, c.renda * LIM_PARC)}</span>
+      <span class="meter"><span class="lbl"><span>Parcelado / limite 20% da venda</span><span class="num">${pct(res.pSaldo / ENT_MAX, 0)}</span></span>${barra(res.saldo, venda * ENT_MAX)}</span>
     </div>`);
 
   resumo(res, c);
@@ -607,7 +615,7 @@ function resumo(res, c) {
   // descrição em texto
   const cv = condicaoVenda(res, c);
   const li = [];
-  li.push(`<li>Torre ${c.u[0]}, unidade <b>${c.u[1]}</b>, ${m2(c.u[2])}. Valor de venda <b class="num">${brl(venda)}</b>.</li>`);
+  li.push(`<li>Torre ${c.u[0]}, unidade <b>${c.u[1]}</b>, ${quartos(c.u[2]) ? quartos(c.u[2]) + ', ' : ''}${m2(c.u[2])}. Valor de venda <b class="num">${brl(venda)}</b>.</li>`);
   li.push(`<li>Sinal de <b class="num">${brl(c.sinal)}</b> (${pct(c.sinal / venda, 2)})${c.sinais.length > 1
     ? ` em ${c.sinais.length} entradas: ${c.sinais.map(e => `${brl(e.valor)} em ${dataBR(e.data)}`).join(', ')}`
     : `, à vista em ${dataBR(c.d0)}`}.</li>`);
@@ -703,7 +711,7 @@ function renderCmp() {
   $('cmp').innerHTML = !L.length ? '' :
     `<tr><th>Unidade</th><th>Venda</th><th>Financiado</th><th>Sinal</th><th>Parcelas</th><th>Balões</th><th>Parcelado</th><th>Situação</th><th></th></tr>` +
     L.map((s, i) => `<tr>
-      <td class="l">T${s.t} · ${s.u}<br><span class="under">${m2(s.area)}</span></td>
+      <td class="l">T${s.t} · ${s.u}<br><span class="under">${planta(s.area)}</span></td>
       <td class="num">${brl(s.venda)}</td>
       <td class="num">${brl(s.fin)}<br><span class="under">${pct(s.fin / s.venda)}</span></td>
       <td class="num">${brl(s.sinal)}${s.vezes > 1 ? `<br><span class="under">${s.vezes} entradas</span>` : ''}${s.fgts ? `<br><span class="under">FGTS ${brl(s.fgts)}</span>` : ''}</td>
