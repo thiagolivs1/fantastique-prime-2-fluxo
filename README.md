@@ -1,10 +1,5 @@
-# Fantastique Prime II — Simulador de fluxo
+# Fantastique Prime II — Simulador de fluxo (endereço antigo)
 
-Simulador de fluxo de pagamento do empreendimento Fantastique Prime II (FAN Construções).
+O simulador mudou para o Espelho 3D: https://thiagolivs1.github.io/espelho-3d/fantastique-prime-2/simulador/
 
-- `index.html` — escolha da unidade na implantação, propostas linear e com balões, correção INCC / IPCA + 1% a.m. e exportação para a proposta.
-- `Proposta Prime 2.html` — ficha de proposta que gera o PDF preenchido.
-
-Os dois arquivos funcionam sozinhos (tabela de preços, imagem e biblioteca de PDF embutidas). Abra no navegador (Chrome/Safari) — pré-visualizações do WhatsApp e do app Arquivos não executam JavaScript.
-
-Tabela de referência: Tabela 60X Lançamento Prime II (21/08/2026). Entrega prevista: agosto/2029.
+Este repositório só redireciona o link antigo (`index.html` e `Proposta Prime 2.html`, mantendo o `#fluxo=` da proposta).
